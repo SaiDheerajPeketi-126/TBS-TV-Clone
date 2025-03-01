@@ -1,11 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
-import yfinance as yf
+from typing import Dict, Any
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 import math
 
 app = FastAPI()
@@ -28,33 +27,45 @@ class BacktestRequest(BaseModel):
     parameters: Dict[str, Any]
 
 @app.get("/api/data")
-async def get_market_data(symbol: str, timeframe: str, start: str, end: str):
+async def get_market_data():
+    """
+    Reads market data from an Excel file that has columns:
+      timestamp, open, high, low, close, volume
+    Then returns the requested date range in a format suitable for the frontend.
+    """
     try:
-        # Convert timeframe to yfinance format
-        interval = {
-            "1m": "1m",
-            "5m": "5m",
-            "15m": "15m",
-            "30m": "30m",
-            "1h": "1h",
-            "1d": "1d",
-            "1w": "1wk",
-        }.get(timeframe, "1d")
+        # Read data from Excel
+        data = pd.read_excel("../NSE_TRIVENI-BL_TRIVENI.xlsx")  # <-- change this to your Excel file name/path
+
+        start = data["timestamp"].max()
+        end = data["timestamp"].min()
         
-        # Fetch data from Yahoo Finance
-        data = yf.download(
-            symbol,
-            start=start,
-            end=end,
-            interval=interval,
-            auto_adjust=True
-        )
+        # Convert timestamp column to datetime
+        data["timestamp"] = pd.to_datetime(data["timestamp"])
         
-        # Format data for frontend
+        # Rename columns to match your existing strategy code
+        data.rename(columns={
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume"
+        }, inplace=True)
+        
+        # Filter by the requested date range
+        start_dt = pd.to_datetime(start)
+        end_dt = pd.to_datetime(end)
+        mask = (data["timestamp"] >= start_dt) & (data["timestamp"] <= end_dt)
+        data = data.loc[mask].copy()
+        
+        # Sort by timestamp (just in case)
+        data.sort_values("timestamp", inplace=True)
+        
+        # Format data for the frontend
         candles = []
-        for timestamp, row in data.iterrows():
+        for _, row in data.iterrows():
             candles.append({
-                "time": timestamp.isoformat(),
+                "time": row["timestamp"].isoformat(),
                 "open": float(row["Open"]),
                 "high": float(row["High"]),
                 "low": float(row["Low"]),
@@ -69,25 +80,33 @@ async def get_market_data(symbol: str, timeframe: str, start: str, end: str):
 
 @app.post("/api/backtest")
 async def run_backtest(request: BacktestRequest):
+    """
+    Reads market data from an Excel file (same format as above),
+    then runs the requested strategy on the specified date range.
+    """
     try:
-        # Fetch market data
-        interval = {
-            "1m": "1m",
-            "5m": "5m",
-            "15m": "15m",
-            "30m": "30m",
-            "1h": "1h",
-            "1d": "1d",
-            "1w": "1wk",
-        }.get(request.timeframe, "1d")
+        # Read data from Excel
+        data = pd.read_excel("my_data.xlsx")  # <-- change this to your Excel file name/path
+        data["timestamp"] = pd.to_datetime(data["timestamp"])
         
-        data = yf.download(
-            request.symbol,
-            start=request.startDate,
-            end=request.endDate,
-            interval=interval,
-            auto_adjust=True
-        )
+        # Rename columns to match your existing strategy code
+        data.rename(columns={
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume"
+        }, inplace=True)
+        
+        # Filter data by start/end dates
+        start_dt = pd.to_datetime(request.startDate)
+        end_dt = pd.to_datetime(request.endDate)
+        mask = (data["timestamp"] >= start_dt) & (data["timestamp"] <= end_dt)
+        data = data.loc[mask].copy()
+        
+        # Sort and set index to timestamp so the strategy logic works as before
+        data.sort_values("timestamp", inplace=True)
+        data.set_index("timestamp", inplace=True)
         
         # Run the appropriate strategy
         if request.strategy == "Moving Average Crossover":
@@ -123,10 +142,7 @@ def moving_average_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     data.loc[data["fast_ma"] < data["slow_ma"], "signal"] = -1
     
     # Calculate trades
-    data["position"] = data["signal"].shift(1)
-    data["position"] = data["position"].fillna(0)
-    
-    # Calculate trade entries and exits
+    data["position"] = data["signal"].shift(1).fillna(0)
     trades = []
     current_position = 0
     entry_price = 0
@@ -144,7 +160,7 @@ def moving_average_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
                 "profit": None
             })
         elif row["position"] < current_position:  # Sell signal
-            if current_position > 0:  # If we have a position to close
+            if current_position > 0:  # If we have a long position to close
                 profit = row["Close"] - entry_price
                 trades.append({
                     "type": "sell",
@@ -162,16 +178,14 @@ def moving_average_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     data["strategy_returns"] = data["position"] * data["returns"]
     
     # Calculate metrics
-    starting_balance = 10000  # Starting with $10,000
-    cumulative_returns = (1 + data["strategy_returns"]).cumprod()
+    starting_balance = 10000
+    cumulative_returns = (1 + data["strategy_returns"].fillna(0)).cumprod()
     ending_balance = starting_balance * cumulative_returns.iloc[-1]
     
-    # Calculate winning and losing trades
+    # Calculate winning/losing trades
     winning_trades = len([t for t in trades if t.get("profit", 0) > 0])
     losing_trades = len([t for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) <= 0])
     total_trades = winning_trades + losing_trades
-    
-    # Calculate win rate
     win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
     
     # Calculate max drawdown
@@ -180,7 +194,10 @@ def moving_average_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     max_drawdown = abs(drawdown.min())
     
     # Calculate Sharpe ratio (assuming risk-free rate = 0)
-    sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)  # Annualized
+    if data["strategy_returns"].std() == 0:
+        sharpe_ratio = 0
+    else:
+        sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)
     
     # Calculate profit factor
     gross_profit = sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) > 0])
@@ -195,7 +212,7 @@ def moving_average_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
         "profitFactor": profit_factor,
         "netProfit": float(ending_balance - starting_balance),
         "maxDrawdown": float(max_drawdown),
-        "sharpeRatio": float(sharpe_ratio) if not math.isnan(sharpe_ratio) else 0,
+        "sharpeRatio": float(sharpe_ratio),
         "startingBalance": starting_balance,
         "endingBalance": float(ending_balance),
         "trades": trades
@@ -214,35 +231,33 @@ def rsi_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     avg_gain = gain.rolling(window=period).mean()
     avg_loss = loss.rolling(window=period).mean()
     
-    # First RSI calculation
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
     data["RSI"] = rsi
     
     # Generate signals
     data["signal"] = 0
-    data.loc[data["RSI"] < oversold, "signal"] = 1  # Buy when RSI is oversold
-    data.loc[data["RSI"] > overbought, "signal"] = -1  # Sell when RSI is overbought
+    data.loc[data["RSI"] < oversold, "signal"] = 1  # Buy
+    data.loc[data["RSI"] > overbought, "signal"] = -1  # Sell
     
-    # Calculate trades
+    # Calculate positions
     data["position"] = 0
     position = 0
-    
     for i in range(1, len(data)):
         if data["signal"].iloc[i] == 1 and position <= 0:
-            position = 1  # Enter long position
+            position = 1
         elif data["signal"].iloc[i] == -1 and position >= 0:
-            position = -1  # Enter short position
+            position = -1
         data["position"].iloc[i] = position
     
-    # Calculate trade entries and exits
+    # Calculate trades
     trades = []
     current_position = 0
     entry_price = 0
     entry_time = None
     
     for index, row in data.iterrows():
-        if row["position"] > current_position:  # Buy signal
+        if row["position"] > current_position:  # Buy
             current_position = 1
             entry_price = row["Close"]
             entry_time = index
@@ -252,8 +267,8 @@ def rsi_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
                 "price": float(entry_price),
                 "profit": None
             })
-        elif row["position"] < current_position:  # Sell signal
-            if current_position > 0:  # If we have a position to close
+        elif row["position"] < current_position:  # Sell
+            if current_position > 0:  # Close long
                 profit = row["Close"] - entry_price
                 trades.append({
                     "type": "sell",
@@ -271,27 +286,24 @@ def rsi_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     data["strategy_returns"] = data["position"].shift(1) * data["returns"]
     
     # Calculate metrics
-    starting_balance = 10000  # Starting with $10,000
+    starting_balance = 10000
     cumulative_returns = (1 + data["strategy_returns"].fillna(0)).cumprod()
     ending_balance = starting_balance * cumulative_returns.iloc[-1]
     
-    # Calculate winning and losing trades
     winning_trades = len([t for t in trades if t.get("profit", 0) > 0])
     losing_trades = len([t for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) <= 0])
     total_trades = winning_trades + losing_trades
-    
-    # Calculate win rate
     win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
     
-    # Calculate max drawdown
     cumulative_max = cumulative_returns.cummax()
     drawdown = (cumulative_returns / cumulative_max - 1) * 100
     max_drawdown = abs(drawdown.min())
     
-    # Calculate Sharpe ratio (assuming risk-free rate = 0)
-    sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)  # Annualized
+    if data["strategy_returns"].std() == 0:
+        sharpe_ratio = 0
+    else:
+        sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)
     
-    # Calculate profit factor
     gross_profit = sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) > 0])
     gross_loss = abs(sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) < 0]))
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
@@ -304,7 +316,7 @@ def rsi_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
         "profitFactor": profit_factor,
         "netProfit": float(ending_balance - starting_balance),
         "maxDrawdown": float(max_drawdown),
-        "sharpeRatio": float(sharpe_ratio) if not math.isnan(sharpe_ratio) else 0,
+        "sharpeRatio": float(sharpe_ratio),
         "startingBalance": starting_balance,
         "endingBalance": float(ending_balance),
         "trades": trades
@@ -313,7 +325,7 @@ def rsi_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
 def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     code = parameters.get("code", "")
     
-    # Add some commonly used indicators to the dataframe
+    # Add some commonly used indicators
     data["sma_9"] = data["Close"].rolling(window=9).mean()
     data["sma_21"] = data["Close"].rolling(window=21).mean()
     data["ema_9"] = data["Close"].ewm(span=9, adjust=False).mean()
@@ -332,9 +344,8 @@ def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     buy_signals = np.zeros(len(data))
     sell_signals = np.zeros(len(data))
     
-    # Execute user code
+    # Execute user code safely
     try:
-        # Create a local environment with necessary variables
         local_env = {
             "df": data,
             "np": np,
@@ -342,15 +353,10 @@ def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
             "buy_signals": buy_signals,
             "sell_signals": sell_signals
         }
-        
-        # Execute the code
         exec(code, {}, local_env)
-        
-        # Get results
         buy_signals = local_env.get("buy_signals", buy_signals)
         sell_signals = local_env.get("sell_signals", sell_signals)
     except Exception as e:
-        # Return error
         return {
             "error": str(e),
             "totalTrades": 0,
@@ -397,10 +403,9 @@ def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
             entry_price = data["Close"].iloc[i]
             entry_time = index
     
-    # Calculate strategy returns
+    # Strategy returns
     position_array = np.zeros(len(data))
     current_position = 0
-    
     for i in range(len(data)):
         if buy_signals[i] and current_position <= 0:
             current_position = 1
@@ -413,27 +418,24 @@ def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     data["strategy_returns"] = data["position"].shift(1) * data["returns"]
     
     # Calculate metrics
-    starting_balance = 10000  # Starting with $10,000
+    starting_balance = 10000
     cumulative_returns = (1 + data["strategy_returns"].fillna(0)).cumprod()
     ending_balance = starting_balance * cumulative_returns.iloc[-1]
     
-    # Calculate winning and losing trades
     winning_trades = len([t for t in trades if t.get("profit", 0) > 0])
     losing_trades = len([t for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) <= 0])
     total_trades = winning_trades + losing_trades
-    
-    # Calculate win rate
     win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
     
-    # Calculate max drawdown
     cumulative_max = cumulative_returns.cummax()
     drawdown = (cumulative_returns / cumulative_max - 1) * 100
     max_drawdown = abs(drawdown.min())
     
-    # Calculate Sharpe ratio (assuming risk-free rate = 0)
-    sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)  # Annualized
+    if data["strategy_returns"].std() == 0:
+        sharpe_ratio = 0
+    else:
+        sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)
     
-    # Calculate profit factor
     gross_profit = sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) > 0])
     gross_loss = abs(sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) < 0]))
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
@@ -446,7 +448,7 @@ def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
         "profitFactor": profit_factor,
         "netProfit": float(ending_balance - starting_balance),
         "maxDrawdown": float(max_drawdown),
-        "sharpeRatio": float(sharpe_ratio) if not math.isnan(sharpe_ratio) else 0,
+        "sharpeRatio": float(sharpe_ratio),
         "startingBalance": starting_balance,
         "endingBalance": float(ending_balance),
         "trades": trades
@@ -455,4 +457,3 @@ def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

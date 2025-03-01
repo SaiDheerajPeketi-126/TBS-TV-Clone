@@ -23,7 +23,7 @@ function App() {
     setError(null);
     
     try {
-      const response = await fetch(`http://localhost:8000/api/data?symbol=${symbol}&timeframe=${timeframe}&start=${startDate}&end=${endDate}`);
+      const response = await fetch(`http://localhost:8000/api/data`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch data');
