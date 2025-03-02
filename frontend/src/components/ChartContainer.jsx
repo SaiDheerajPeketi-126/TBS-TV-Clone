@@ -66,9 +66,17 @@ function ChartContainer() {
       priceFormat: {
         type: 'volume',
       },
-      priceScaleId: '',
+      priceScaleId: 'volume',
       scaleMargins: {
         top: 0.8,
+        bottom: 0,
+      },
+    });
+    
+    // Ensure the volume scale is independent
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: {
+        top: 0.7, // Adjust how much space volume takes
         bottom: 0,
       },
     });
