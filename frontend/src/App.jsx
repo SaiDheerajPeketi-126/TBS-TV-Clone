@@ -1,26 +1,20 @@
 import React from 'react';
-import { ChartComponent } from './ChartComponent';
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import ChartContainer from './components/ChartContainer';
+import Footer from './components/Footer';
 
-const initialData = [
-    { time: '2018-12-22', value: 32.51 },
-    { time: '2018-12-23', value: 31.11 },
-    { time: '2018-12-24', value: 27.02 },
-    { time: '2018-12-25', value: 27.32 },
-    { time: '2018-12-26', value: 25.17 },
-    { time: '2018-12-27', value: 28.89 },
-    { time: '2018-12-28', value: 25.46 },
-    { time: '2018-12-29', value: 23.92 },
-    { time: '2018-12-30', value: 22.68 },
-    { time: '2018-12-31', value: 22.67 },
-];
-
-export function App() {
-    return (
-        <div>
-            <h1>Trading Chart</h1>
-            <ChartComponent data={initialData} />
-        </div>
-    );
+function App() {
+  return (
+    <div className="flex flex-col h-screen overflow-hidden bg-gray-900 text-white">
+      <Header />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar />
+        <ChartContainer />
+      </div>
+      <Footer />
+    </div>
+  );
 }
 
 export default App;
