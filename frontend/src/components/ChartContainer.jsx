@@ -4,13 +4,14 @@ import { generateMockData } from '../utils/mockData';
 import ChartToolbar from './ChartToolbar';
 import ChartHeader from './ChartHeader';
 
-function ChartContainer() {
+function ChartContainer({ isSidebarOpen, toggleSidebar }) {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const [interval, setInterval] = useState('1D');
   const [chartStyle, setChartStyle] = useState('candles');
   const [chartData, setChartData] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Initialize chart
   useEffect(() => {
@@ -29,7 +30,7 @@ function ChartContainer() {
         horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
       },
       width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight - 100,
+      height: chartContainerRef.current.clientHeight,
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
@@ -69,7 +70,7 @@ function ChartContainer() {
     const handleResize = () => {
       chartRef.current.applyOptions({
         width: chartContainerRef.current.clientWidth,
-        height: chartContainerRef.current.clientHeight - 100,
+        height: chartContainerRef.current.clientHeight,
       });
     };
 
@@ -79,7 +80,7 @@ function ChartContainer() {
       chartRef.current.remove();
       window.removeEventListener('resize', handleResize);
     };
-  }, [interval]);
+  }, [interval, isFullscreen]);
 
   // Handle chart style changes
   useEffect(() => {
@@ -94,11 +95,6 @@ function ChartContainer() {
         // Continue with creating a new series
       }
     }
-
-    // Remove previous series if it exists
-    // if (seriesRef.current) {
-    //   chartRef.current.removeSeries(seriesRef.current);
-    // }
 
     // Apply different chart styles
     switch (chartStyle) {
@@ -235,16 +231,79 @@ function ChartContainer() {
 
   }, [chartStyle, chartData]);
 
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      if (chartContainerRef.current.requestFullscreen) {
+        chartContainerRef.current.requestFullscreen();
+      } else if (chartContainerRef.current.webkitRequestFullscreen) {
+        chartContainerRef.current.webkitRequestFullscreen();
+      } else if (chartContainerRef.current.msRequestFullscreen) {
+        chartContainerRef.current.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+      setIsFullscreen(false);
+    }
+  };
+
+  // Listen for fullscreen change events (e.g., when user presses Esc to exit)
+  useEffect(() => {
+    const fullscreenChangeHandler = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', fullscreenChangeHandler);
+    document.addEventListener('webkitfullscreenchange', fullscreenChangeHandler);
+    document.addEventListener('mozfullscreenchange', fullscreenChangeHandler);
+    document.addEventListener('MSFullscreenChange', fullscreenChangeHandler);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', fullscreenChangeHandler);
+      document.removeEventListener('webkitfullscreenchange', fullscreenChangeHandler);
+      document.removeEventListener('mozfullscreenchange', fullscreenChangeHandler);
+      document.removeEventListener('MSFullscreenChange', fullscreenChangeHandler);
+    };
+  }, []);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <ChartHeader symbol="BTC/USD" price="66,423.50" change={1.24} />
+      <ChartHeader 
+        symbol="BTC/USD" 
+        price="66,423.50" 
+        change={1.24} 
+        toggleSidebar={toggleSidebar}
+        isSidebarOpen={isSidebarOpen}
+        toggleFullscreen={toggleFullscreen}
+        isFullscreen={isFullscreen}
+      />
       <ChartToolbar 
         interval={interval} 
         setInterval={setInterval} 
         chartStyle={chartStyle} 
         setChartStyle={setChartStyle} 
       />
-      <div className="flex-1" ref={chartContainerRef}></div>
+      <div className="flex-1 relative" ref={chartContainerRef}>
+        {!isFullscreen && (
+          <button 
+            onClick={toggleFullscreen}
+            className="absolute top-2 right-2 z-10 p-2 bg-gray-800 hover:bg-gray-700 rounded opacity-50 hover:opacity-100"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+              <path fillRule="evenodd" d="M5.25 2A3.25 3.25 0 002 5.25v9.5A3.25 3.25 0 005.25 18h9.5A3.25 3.25 0 0018 14.75v-9.5A3.25 3.25 0 0014.75 2h-9.5zm.22 13.72h2.03a.75.75 0 000-1.5H5.5a.75.75 0 00-.75.75v2c0 .414.336.75.75.75a.75.75 0 00.75-.75v-1.25zm9.03-8.72H12.5a.75.75 0 010-1.5h2a.75.75 0 01.75.75v2a.75.75 0 01-1.5 0V7z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
