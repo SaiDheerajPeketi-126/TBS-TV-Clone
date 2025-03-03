@@ -8,7 +8,7 @@ function Header() {
         <div className="text-blue-500 font-bold text-xl mr-6">TradingClone</div>
         <nav className="hidden md:flex space-x-4">
           <a href="#" className="px-2 py-1 hover:bg-gray-700 rounded">Charts</a>
-          <a href="#" className="px-2 py-1 hover:bg-gray-700 rounded">Screener</a>
+          <a href="https://www.screener.in/" className="px-2 py-1 hover:bg-gray-700 rounded">Screener</a>
           <a href="#" className="px-2 py-1 hover:bg-gray-700 rounded">Market</a>
           <a href="#" className="px-2 py-1 hover:bg-gray-700 rounded">Community</a>
         </nav>

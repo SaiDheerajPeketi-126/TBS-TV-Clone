@@ -232,7 +232,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
         seriesRef.current = chartRef.current.addBarSeries({
           upColor: '#26a69a',
           downColor: '#ef5350',
-          thinBars: false,
+          thinBars: true,
         });
         seriesRef.current.setData(chartData);
         break;
