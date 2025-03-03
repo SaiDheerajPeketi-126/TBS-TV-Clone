@@ -27,7 +27,7 @@ function ChartHeader({ symbol, price, change, toggleSidebar, isSidebarOpen, togg
           </button>
         </div>
         
-        <div className="text-lg font-medium">{price}</div>
+        <div className={change >= 0 ? "text-green-500" : "text-red-500"}>{price}</div>
         <div className={change >= 0 ? "text-green-500" : "text-red-500"}>
           {change >= 0 ? "+" : ""}{change}%
         </div>
@@ -49,9 +49,9 @@ function ChartHeader({ symbol, price, change, toggleSidebar, isSidebarOpen, togg
           </svg>
         </button>
         
-        <button className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm">
+        {/* <button className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm">
           Buy / Sell
-        </button>
+        </button> */}
       </div>
     </div>
   );

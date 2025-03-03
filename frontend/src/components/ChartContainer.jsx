@@ -12,6 +12,13 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
   const [interval, setInterval] = useState('1D');
   const [chartStyle, setChartStyle] = useState('candles');
   const [chartData, setChartData] = useState(null);
+  const [highlightedCandle, setHighlightedCandle] = useState({
+    open: "N/A",
+    high: "N/A",
+    low: "N/A",
+    close: "N/A",
+    change: "N/A",
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Function to update volume scale dynamically
@@ -96,6 +103,26 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
 
     // Apply dynamic scaling
     updateVolumeScale(data);
+
+    // Update OHLC data on crosshair move and update ChartHeader
+    chartRef.current.subscribeCrosshairMove(param => {
+      if (!param || !param.seriesData) return;
+
+      const candleData = param.seriesData.get(seriesRef.current);
+      if (!candleData) return;
+
+      const { open, high, low, close } = candleData;
+      const percentageChange = ((close - open) / open) * 100;
+      const formattedChange = `${percentageChange.toFixed(2)}`;
+
+      setHighlightedCandle({
+        open: open.toFixed(2),
+        high: high.toFixed(2),
+        low: low.toFixed(2),
+        close: close.toFixed(2),
+        change: formattedChange,
+      });
+    });
 
     const handleResize = () => {
       chartRef.current.applyOptions({
@@ -330,8 +357,8 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
     <div className="flex-1 flex flex-col overflow-hidden">
       <ChartHeader 
         symbol="BTC/USD" 
-        price="66,423.50" 
-        change={1.24} 
+        price={`O: ${highlightedCandle.open} H: ${highlightedCandle.high} L: ${highlightedCandle.low} C: ${highlightedCandle.close}`} 
+        change={highlightedCandle.change} 
         toggleSidebar={toggleSidebar}
         isSidebarOpen={isSidebarOpen}
         toggleFullscreen={toggleFullscreen}
