@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart } from 'lightweight-charts';
+import { createChart, PriceScaleMode, CrosshairMode } from 'lightweight-charts';
 import { generateMockData } from '../utils/mockData';
 import ChartToolbar from './ChartToolbar';
 import ChartHeader from './ChartHeader';
@@ -35,6 +35,13 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
         timeVisible: true,
         secondsVisible: false,
         borderColor: 'rgba(42, 46, 57, 0.5)',
+      },
+      priceScale: {
+        mode: PriceScaleMode.Normal, // Keeps price movement free
+        autoScale: true,
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal, // Disable snapping to price
       },
     };
 
