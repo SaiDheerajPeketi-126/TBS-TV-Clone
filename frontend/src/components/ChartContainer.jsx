@@ -275,6 +275,19 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
     };
   }, []);
 
+  // Update chart size when sidebar toggle state changes
+  useEffect(() => {
+    if (chartRef.current && chartContainerRef.current) {
+      // Schedule the resize after the DOM has been updated
+      setTimeout(() => {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight,
+        });
+      }, 0);
+    }
+  }, [isSidebarOpen]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <ChartHeader 
