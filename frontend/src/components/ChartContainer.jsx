@@ -8,10 +8,29 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
   const chartContainerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
+  const volumeSeriesRef = useRef(null);
   const [interval, setInterval] = useState('1D');
   const [chartStyle, setChartStyle] = useState('candles');
   const [chartData, setChartData] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Function to update volume scale dynamically
+  const updateVolumeScale = (data) => {
+    if (!chartRef.current || !volumeSeriesRef.current) return;
+
+    // Find the max volume to determine scale
+    const maxVolume = Math.max(...data.map(d => d.volume));
+
+    // Adjust scale dynamically based on max volume
+    const topMargin = Math.max(0.7 - maxVolume / 10000000, 0.4); // Adjust range as needed
+
+    chartRef.current.priceScale('volume').applyOptions({
+      scaleMargins: {
+        top: topMargin,
+        bottom: 0,
+      },
+    });
+  };
 
   // Initialize chart
   useEffect(() => {
@@ -19,6 +38,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
 
     // Clear the seriesRef when recreating the chart
     seriesRef.current = null;
+    volumeSeriesRef.current = null;
 
     const chartOptions = {
       layout: {
@@ -69,16 +89,21 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
     // Set price scale for volume
     chartRef.current.priceScale('volume').applyOptions({
       scaleMargins: {
-        top: 0.8,
+        top: 0.91,
         bottom: 0,
       },
     });
+
+    // Apply dynamic scaling
+    updateVolumeScale(data);
 
     const handleResize = () => {
       chartRef.current.applyOptions({
         width: chartContainerRef.current.clientWidth,
         height: chartContainerRef.current.clientHeight,
       });
+
+      updateVolumeScale(chartData); // Update volume scale on resize
     };
 
     window.addEventListener('resize', handleResize);
@@ -88,6 +113,11 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
       window.removeEventListener('resize', handleResize);
     };
   }, [interval, isFullscreen]);
+
+  // Update volume scale when chart data changes
+  useEffect(() => {
+    if (chartData) updateVolumeScale(chartData);
+  }, [chartData]);
 
   // Handle chart style changes
   useEffect(() => {
@@ -231,8 +261,8 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
     // Adjust price scale margins
     chartRef.current.priceScale('right').applyOptions({
       scaleMargins: {
-        top: 0.1,
-        bottom: 0.25,
+        top: 0.05,
+        bottom: 0.15,
       },
     });
 
@@ -291,6 +321,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
           width: chartContainerRef.current.clientWidth,
           height: chartContainerRef.current.clientHeight,
         });
+        updateVolumeScale(chartData);
       }, 0);
     }
   }, [isSidebarOpen]);
