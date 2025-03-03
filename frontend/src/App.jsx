@@ -40,34 +40,70 @@ function App() {
   };
   
   // Run backtest
+  // const runBacktest = async (strategyName, parameters) => {
+  //   setIsLoading(true);
+    
+  //   try {
+  //     const response = await fetch('http://localhost:8000/api/backtest', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       },
+  //       body: JSON.stringify({
+  //         symbol,
+  //         timeframe,
+  //         startDate,
+  //         endDate,
+  //         strategy: strategyName,
+  //         parameters
+  //       })
+  //     });
+      
+  //     if (!response.ok) {
+  //       throw new Error('Failed to run backtest');
+  //     }
+      
+  //     const results = await response.json();
+  //     setBacktestResults(results);
+  //   } catch (err) {
+  //     setError(err.message);
+  //     console.error(err);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
   const runBacktest = async (strategyName, parameters) => {
     setIsLoading(true);
-    
+  
+    const requestBody = {
+      symbol: symbol || "",  // Ensure it's a string
+      timeframe: timeframe || "",  // Ensure it's a string
+      startDate: startDate || "",  // Ensure it's a string
+      endDate: endDate || "",  // Ensure it's a string
+      strategy: strategyName || "",  // Ensure it's a string
+      parameters: parameters || {}  // Ensure it's an object
+    };
+  
+    console.log("Sending request:", requestBody); // Debugging
+  
     try {
       const response = await fetch('http://localhost:8000/api/backtest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          symbol,
-          timeframe,
-          startDate,
-          endDate,
-          strategy: strategyName,
-          parameters
-        })
+        body: JSON.stringify(requestBody) // Send properly formatted JSON
       });
-      
+  
       if (!response.ok) {
         throw new Error('Failed to run backtest');
       }
-      
+  
       const results = await response.json();
       setBacktestResults(results);
     } catch (err) {
       setError(err.message);
-      console.error(err);
+      console.error("❌ API Error:", err);
     } finally {
       setIsLoading(false);
     }

@@ -6,6 +6,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import math
+import os
+import requests
+
+from classes.localExcel import LocalExcel
 
 app = FastAPI()
 
@@ -26,57 +30,29 @@ class BacktestRequest(BaseModel):
     strategy: str
     parameters: Dict[str, Any]
 
+@app.get("/api/search")
+async def get_all_sheets(path: str = "../sheets"):
+    
+    localexcel = LocalExcel(path=path)
+    return localexcel.get_all_local()
+
+
+
 @app.get("/api/data")
-async def get_market_data():
+async def get_market_data(stock_exchange:str,stock_symbol:str ,path :str = "../sheets"):
     """
     Reads market data from an Excel file that has columns:
       timestamp, open, high, low, close, volume
     Then returns the requested date range in a format suitable for the frontend.
     """
+    
+    localexcel = LocalExcel(path=path)
     try:
-        # Read data from Excel
-        data = pd.read_excel("../NSE_TRIVENI-BL_TRIVENI.xlsx")  # <-- change this to your Excel file name/path
-
-        start = data["timestamp"].max()
-        end = data["timestamp"].min()
-        
-        # Convert timestamp column to datetime
-        data["timestamp"] = pd.to_datetime(data["timestamp"])
-        
-        # Rename columns to match your existing strategy code
-        data.rename(columns={
-            "open": "Open",
-            "high": "High",
-            "low": "Low",
-            "close": "Close",
-            "volume": "Volume"
-        }, inplace=True)
-        
-        # Filter by the requested date range
-        start_dt = pd.to_datetime(start)
-        end_dt = pd.to_datetime(end)
-        mask = (data["timestamp"] >= start_dt) & (data["timestamp"] <= end_dt)
-        data = data.loc[mask].copy()
-        
-        # Sort by timestamp (just in case)
-        data.sort_values("timestamp", inplace=True)
-        
-        # Format data for the frontend
-        candles = []
-        for _, row in data.iterrows():
-            candles.append({
-                "time": row["timestamp"].isoformat(),
-                "open": float(row["Open"]),
-                "high": float(row["High"]),
-                "low": float(row["Low"]),
-                "close": float(row["Close"]),
-                "volume": float(row["Volume"])
-            })
-        
-        return {"candles": candles}
+        return localexcel.search_for_stock(stock_exchange=stock_exchange,stock_symbol=stock_symbol)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/backtest")
 async def run_backtest(request: BacktestRequest):
@@ -86,9 +62,9 @@ async def run_backtest(request: BacktestRequest):
     """
     try:
         # Read data from Excel
-        data = pd.read_excel("my_data.xlsx")  # <-- change this to your Excel file name/path
+        data = pd.read_excel("../NSE_TRIVENI-BL_TRIVENI.xlsx")  # <-- change this to your Excel file name/path
         data["timestamp"] = pd.to_datetime(data["timestamp"])
-        
+
         # Rename columns to match your existing strategy code
         data.rename(columns={
             "open": "Open",
@@ -99,124 +75,73 @@ async def run_backtest(request: BacktestRequest):
         }, inplace=True)
         
         # Filter data by start/end dates
-        start_dt = pd.to_datetime(request.startDate)
-        end_dt = pd.to_datetime(request.endDate)
+        start_dt =  data["timestamp"].max()
+        end_dt =  data["timestamp"].min()
         mask = (data["timestamp"] >= start_dt) & (data["timestamp"] <= end_dt)
         data = data.loc[mask].copy()
         
         # Sort and set index to timestamp so the strategy logic works as before
         data.sort_values("timestamp", inplace=True)
         data.set_index("timestamp", inplace=True)
-        
+
+        # mean1,median1 = data["volume"].mean(),data["volume"].median()
+        # print(mean1)
+        # print(median1)
         # Run the appropriate strategy
-        if request.strategy == "Moving Average Crossover":
-            results = moving_average_strategy(data, request.parameters)
-        elif request.strategy == "RSI Strategy":
-            results = rsi_strategy(data, request.parameters)
-        elif request.strategy == "Custom":
-            results = custom_strategy(data, request.parameters)
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported strategy")
+        # if request.strategy == "Moving Average Crossover":
+        #     results = moving_average_strategy(data, request.parameters)
+        # elif request.strategy == "RSI Strategy":
+        #     results = rsi_strategy(data, request.parameters)
+        # elif request.strategy == "Custom":
+        #     results = custom_strategy(data, request.parameters)
+        # else:
+        #     raise HTTPException(status_code=400, detail="Unsupported strategy")
         
-        return results
+        # return {"Mean Volume":mean1,"Median Volume":median1}
+        return {
+    "totalTrades": 25,
+    "winningTrades": 15,
+    "losingTrades": 10,
+    "winRate": 60.0,  # (15/25) * 100
+    "profitFactor": 1.8,  # Gross profit / Gross loss
+    "netProfit": 1250.75,  # Ending balance - starting balance
+    "maxDrawdown": -5.4,  # Worst drawdown percentage
+    "sharpeRatio": 1.25,  # Risk-adjusted return
+    "startingBalance": 10000.0,
+    "endingBalance": 11250.75,
+    "trades": [
+        {"type": "buy", "time": "2025-02-20T10:00:00", "price": 150.5, "profit": None},
+        {"type": "sell", "time": "2025-02-21T14:30:00", "price": 155.0, "profit": 4.5, "entryTime": "2025-02-20T10:00:00"},
+        {"type": "buy", "time": "2025-02-22T11:15:00", "price": 152.0, "profit": None},
+        {"type": "sell", "time": "2025-02-23T13:45:00", "price": 149.0, "profit": -3.0, "entryTime": "2025-02-22T11:15:00"}
+    ]
+}
+
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def moving_average_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
-    fast_period = parameters.get("fastPeriod", 9)
-    slow_period = parameters.get("slowPeriod", 21)
-    ma_type = parameters.get("maType", "sma")
-    
-    # Calculate indicators
-    if ma_type == "sma":
-        data["fast_ma"] = data["Close"].rolling(window=fast_period).mean()
-        data["slow_ma"] = data["Close"].rolling(window=slow_period).mean()
-    else:  # EMA
-        data["fast_ma"] = data["Close"].ewm(span=fast_period, adjust=False).mean()
-        data["slow_ma"] = data["Close"].ewm(span=slow_period, adjust=False).mean()
-    
-    # Generate signals
-    data["signal"] = 0
-    data.loc[data["fast_ma"] > data["slow_ma"], "signal"] = 1
-    data.loc[data["fast_ma"] < data["slow_ma"], "signal"] = -1
-    
-    # Calculate trades
-    data["position"] = data["signal"].shift(1).fillna(0)
-    trades = []
-    current_position = 0
-    entry_price = 0
-    entry_time = None
-    
-    for index, row in data.iterrows():
-        if row["position"] > current_position:  # Buy signal
-            current_position = 1
-            entry_price = row["Close"]
-            entry_time = index
-            trades.append({
-                "type": "buy",
-                "time": index.isoformat(),
-                "price": float(entry_price),
-                "profit": None
-            })
-        elif row["position"] < current_position:  # Sell signal
-            if current_position > 0:  # If we have a long position to close
-                profit = row["Close"] - entry_price
-                trades.append({
-                    "type": "sell",
-                    "time": index.isoformat(),
-                    "price": float(row["Close"]),
-                    "profit": float(profit),
-                    "entryTime": entry_time.isoformat()
-                })
-            current_position = -1
-            entry_price = row["Close"]
-            entry_time = index
-    
-    # Calculate returns
-    data["returns"] = data["Close"].pct_change()
-    data["strategy_returns"] = data["position"] * data["returns"]
-    
-    # Calculate metrics
-    starting_balance = 10000
-    cumulative_returns = (1 + data["strategy_returns"].fillna(0)).cumprod()
-    ending_balance = starting_balance * cumulative_returns.iloc[-1]
-    
-    # Calculate winning/losing trades
-    winning_trades = len([t for t in trades if t.get("profit", 0) > 0])
-    losing_trades = len([t for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) <= 0])
-    total_trades = winning_trades + losing_trades
-    win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-    
-    # Calculate max drawdown
-    cumulative_max = cumulative_returns.cummax()
-    drawdown = (cumulative_returns / cumulative_max - 1) * 100
-    max_drawdown = abs(drawdown.min())
-    
-    # Calculate Sharpe ratio (assuming risk-free rate = 0)
-    if data["strategy_returns"].std() == 0:
-        sharpe_ratio = 0
-    else:
-        sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)
-    
-    # Calculate profit factor
-    gross_profit = sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) > 0])
-    gross_loss = abs(sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) < 0]))
-    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
-    
-    return {
-        "totalTrades": total_trades,
-        "winningTrades": winning_trades,
-        "losingTrades": losing_trades,
-        "winRate": win_rate,
-        "profitFactor": profit_factor,
-        "netProfit": float(ending_balance - starting_balance),
-        "maxDrawdown": float(max_drawdown),
-        "sharpeRatio": float(sharpe_ratio),
-        "startingBalance": starting_balance,
-        "endingBalance": float(ending_balance),
-        "trades": trades
-    }
+@app.get("/api/tradingview/market-data")
+def tradingview_market_data():
+
+    response = requests.get("http://localhost:3000/market-data?market=BINANCE:BTCUSDT")
+    data = response.json()
+    # print(data)
+    return data
+
+@app.get("/api/tradingview/technical-analysis")
+def tradingview_technical_analysis():
+
+    response = requests.get("http://localhost:3000/technical-analysis?market=BINANCE:BTCUSDT")
+    data = response.json()
+    # print(data)
+    return data
+
+
+
+def moving_average_strategy(data: pd.DataFrame):
+    return data["volume"].mean(),data["volume"].median()
+
 
 def rsi_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
     period = parameters.get("period", 14)
