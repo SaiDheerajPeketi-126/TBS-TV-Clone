@@ -6,6 +6,7 @@ import ChartHeader from './ChartHeader';
 
 function ChartContainer({ isSidebarOpen, toggleSidebar }) {
   const chartContainerRef = useRef(null);
+  const fullScreenContainerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
@@ -299,12 +300,12 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       // Enter fullscreen
-      if (chartContainerRef.current.requestFullscreen) {
-        chartContainerRef.current.requestFullscreen();
-      } else if (chartContainerRef.current.webkitRequestFullscreen) {
-        chartContainerRef.current.webkitRequestFullscreen();
-      } else if (chartContainerRef.current.msRequestFullscreen) {
-        chartContainerRef.current.msRequestFullscreen();
+      if (fullScreenContainerRef.current.requestFullscreen) {
+        fullScreenContainerRef.current.requestFullscreen();
+      } else if (fullScreenContainerRef.current.webkitRequestFullscreen) {
+        fullScreenContainerRef.current.webkitRequestFullscreen();
+      } else if (fullScreenContainerRef.current.msRequestFullscreen) {
+        fullScreenContainerRef.current.msRequestFullscreen();
       }
       setIsFullscreen(true);
     } else {
@@ -349,12 +350,12 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
           height: chartContainerRef.current.clientHeight,
         });
         updateVolumeScale(chartData);
-      }, 0);
+      }, 300); // Match transition duration
     }
   }, [isSidebarOpen]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden" ref={fullScreenContainerRef}>
       <ChartHeader 
         symbol="BTC/USD" 
         price={`O: ${highlightedCandle.open} H: ${highlightedCandle.high} L: ${highlightedCandle.low} C: ${highlightedCandle.close}`} 
@@ -370,11 +371,11 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
         chartStyle={chartStyle} 
         setChartStyle={setChartStyle} 
       />
-      <div className="flex-1 relative" ref={chartContainerRef}>
+      <div className="flex-1 relative transition-all duration-300 ease-in-out" ref={chartContainerRef}>
         {!isFullscreen && (
           <button 
             onClick={toggleFullscreen}
-            className="absolute top-2 right-2 z-10 p-2 bg-gray-800 hover:bg-gray-700 rounded opacity-50 hover:opacity-100"
+            className="absolute top-2 right-2 z-10 p-2 bg-gray-800 hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-opacity duration-300"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
               <path fillRule="evenodd" d="M5.25 2A3.25 3.25 0 002 5.25v9.5A3.25 3.25 0 005.25 18h9.5A3.25 3.25 0 0018 14.75v-9.5A3.25 3.25 0 0014.75 2h-9.5zm.22 13.72h2.03a.75.75 0 000-1.5H5.5a.75.75 0 00-.75.75v2c0 .414.336.75.75.75a.75.75 0 00.75-.75v-1.25zm9.03-8.72H12.5a.75.75 0 010-1.5h2a.75.75 0 01.75.75v2a.75.75 0 01-1.5 0V7z" clipRule="evenodd" />

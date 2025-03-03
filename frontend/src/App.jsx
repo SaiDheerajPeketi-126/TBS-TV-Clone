@@ -15,7 +15,14 @@ function App() {
     <div className="flex flex-col h-screen overflow-hidden bg-gray-900 text-white">
       <Header />
       <div className="flex flex-1 overflow-hidden">
-        {isSidebarOpen && <Sidebar />}
+        {/* Sidebar with animation */}
+        <div 
+          className={`transition-all duration-300 ease-in-out ${
+            isSidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0'
+          } overflow-hidden`}
+        >
+          <Sidebar />
+        </div>
         <ChartContainer 
           isSidebarOpen={isSidebarOpen} 
           toggleSidebar={toggleSidebar} 
