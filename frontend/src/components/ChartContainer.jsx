@@ -357,7 +357,18 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     <div className="flex-1 flex flex-col overflow-hidden" ref={fullScreenContainerRef}>
       <ChartHeader 
         symbol={selectedSymbol}
-        price={`O: ${highlightedCandle.open} H: ${highlightedCandle.high} L: ${highlightedCandle.low} C: ${highlightedCandle.close}`} 
+        price={
+          <>
+            <span className="text-white">O:</span> 
+            <span className={highlightedCandle.change >= 0 ? "text-green-500" : "text-red-500"}>{highlightedCandle.open}</span> 
+            <span className="text-white"> H:</span> 
+            <span className={highlightedCandle.change >= 0 ? "text-green-500" : "text-red-500"}>{highlightedCandle.high}</span> 
+            <span className="text-white"> L:</span> 
+            <span className={highlightedCandle.change >= 0 ? "text-green-500" : "text-red-500"}>{highlightedCandle.low}</span> 
+            <span className="text-white"> C:</span> 
+            <span className={highlightedCandle.change >= 0 ? "text-green-500" : "text-red-500"}>{highlightedCandle.close}</span>
+          </>
+        }         
         change={highlightedCandle.change} 
         toggleSidebar={toggleSidebar}
         isSidebarOpen={isSidebarOpen}
