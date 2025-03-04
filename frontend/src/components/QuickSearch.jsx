@@ -139,7 +139,7 @@ function QuickSearch({
       
       {/* Modal overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center pt-20">
+        <div className="fixed inset-0 bg-opacity-30 backdrop-blur-md z-50 flex items-start justify-center pt-20">
           <div className="bg-gray-800 w-full max-w-md rounded-lg shadow-lg overflow-hidden">
             <div className="relative">
               <input
