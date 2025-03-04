@@ -49,7 +49,7 @@ class LocalExcel:
             return {"error": str(e)}
 
     
-    def search_for_stock(self,stock_exchange,stock_symbol,path = None,):
+    def search_for_stock(self,stock_exchange,stock_symbol,path = None,stock_time_frame = 1):
         '''
         
         '''
@@ -58,7 +58,6 @@ class LocalExcel:
             # Read data from Excel
             path = path+"/"+stock_exchange
               
-            folder_stock_map = {}
             try:
                 for root, dirs, files in os.walk(path):
                     folder_name = os.path.basename(root)
@@ -82,6 +81,21 @@ class LocalExcel:
             start = data["timestamp"].max()
             end = data["timestamp"].min()
             
+            data["timestamp"] = pd.to_datetime(data["timestamp"])
+
+        # **Floor timestamps** to the nearest 5-min, 10-min, etc.
+            time_interval = f"{stock_time_frame}T"  # 'T' represents minutes in pandas
+            data["interval"] = data["timestamp"].dt.floor(time_interval)
+
+            # Group by the new interval column
+            data = data.groupby("interval").agg({
+                "open": "first",  
+                "high": "max",     
+                "low": "min",      
+                "close": "last",   
+                "volume": "sum"   
+            }).reset_index()
+
             # Convert timestamp column to datetime
             # data["datetime"] = pd.to_datetime(data["timestamp"])
 
@@ -97,8 +111,10 @@ class LocalExcel:
                 "low": "Low",
                 "close": "Close",
                 "volume": "Volume",
+                'interval' : "timestamp"
             }, inplace=True)
             
+
             # Filter by the requested date range
 
 
@@ -119,7 +135,7 @@ class LocalExcel:
                     "volume": float(row["Volume"])
                 })
             
-            return {"candles": candles}
+            return {"data_size":len(candles),"candles": candles}
     
         except Exception as e:
             return {"error": str(e)}

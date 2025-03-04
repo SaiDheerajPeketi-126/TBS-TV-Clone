@@ -39,7 +39,7 @@ async def get_all_sheets(path: str = "../sheets"):
 
 
 @app.get("/api/data")
-async def get_market_data(stock_exchange:str,stock_symbol:str ,path :str = "../sheets"):
+async def get_market_data(stock_exchange:str,stock_symbol:str ,path :str = "../sheets",stock_time_frame:int = 1):
     """
     Reads market data from an Excel file that has columns:
       timestamp, open, high, low, close, volume
@@ -48,7 +48,7 @@ async def get_market_data(stock_exchange:str,stock_symbol:str ,path :str = "../s
     
     localexcel = LocalExcel(path=path)
     try:
-        return localexcel.search_for_stock(stock_exchange=stock_exchange,stock_symbol=stock_symbol)
+        return localexcel.search_for_stock(stock_exchange=stock_exchange,stock_symbol=stock_symbol,stock_time_frame = stock_time_frame)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
