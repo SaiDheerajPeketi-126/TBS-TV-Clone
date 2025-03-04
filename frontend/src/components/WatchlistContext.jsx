@@ -72,6 +72,25 @@ export const WatchlistProvider = ({ children }) => {
     return true;
   };
 
+  // Rename watchlist
+  const renameWatchlist = (oldName, newName) => {
+    // Don't allow renaming if the new name already exists or if trying to rename Default
+    if (oldName === 'Default' || watchlistData.lists[newName] || !newName.trim()) {
+      return false;
+    }
+    
+    const newLists = { ...watchlistData.lists };
+    newLists[newName] = [...newLists[oldName]];
+    delete newLists[oldName];
+    
+    setWatchlistData({
+      ...watchlistData,
+      lists: newLists,
+      activeList: watchlistData.activeList === oldName ? newName : watchlistData.activeList
+    });
+    return true;
+  };
+
   // Add symbol to active watchlist
   const addToWatchlist = (symbol, listName = watchlistData.activeList) => {
     const targetList = watchlistData.lists[listName] || [];
@@ -146,6 +165,7 @@ export const WatchlistProvider = ({ children }) => {
       isInWatchlist,
       createWatchlist,
       deleteWatchlist,
+      renameWatchlist,
       setActiveWatchlist,
       getWatchlistNames,
       getActiveWatchlist,

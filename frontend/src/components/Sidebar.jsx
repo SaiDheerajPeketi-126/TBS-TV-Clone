@@ -1,7 +1,8 @@
 import React, { useContext, useState } from 'react';
-import { StarIcon, EyeIcon, HistoryIcon, LayersIcon, GridIcon } from './Icons';
+import { StarIcon, EyeIcon, HistoryIcon, LayersIcon, GridIcon, DotsHorizontalIcon } from './Icons';
 import { WatchlistContext } from './WatchlistContext';
 import CustomWatchlistModal from './CustomWatchlistModal';
+import WatchlistManagementModal from './WatchlistManagementModal';
 
 function Sidebar({ onSymbolSelect }) {
   const { 
@@ -13,7 +14,8 @@ function Sidebar({ onSymbolSelect }) {
     activeWatchlist 
   } = useContext(WatchlistContext);
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   
   // Function to handle when a symbol is clicked
   const handleSymbolClick = (symbol) => {
@@ -41,7 +43,11 @@ function Sidebar({ onSymbolSelect }) {
         <div className="flex items-center justify-between mb-2">
           <div className="font-medium">Watchlist</div>
           <div className="flex space-x-1">
-            <button className="p-1 hover:bg-gray-700 rounded" title="Manage lists">
+            <button 
+              className="p-1 hover:bg-gray-700 rounded" 
+              title="Manage watchlists"
+              onClick={() => setIsManageModalOpen(true)}
+            >
               <EyeIcon className="h-4 w-4" />
             </button>
           </div>
@@ -62,7 +68,7 @@ function Sidebar({ onSymbolSelect }) {
           ))}
           <button 
             className="px-3 py-1 rounded-md whitespace-nowrap bg-gray-700 hover:bg-gray-600"
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsCreateModalOpen(true)}
           >
             + New
           </button>
@@ -125,9 +131,15 @@ function Sidebar({ onSymbolSelect }) {
       
       {/* Custom modal for creating a new watchlist */}
       <CustomWatchlistModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
         onConfirm={handleCreateWatchlist}
+      />
+      
+      {/* Modal for managing (renaming, deleting) watchlists */}
+      <WatchlistManagementModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
       />
     </div>
   );
