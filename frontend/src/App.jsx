@@ -3,9 +3,12 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChartContainer from './components/ChartContainer';
 import Footer from './components/Footer';
+import QuickSearch from './components/QuickSearch';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [currentInterval, setCurrentInterval] = useState('1D'); // Default timeframe
+  const [selectedSymbol, setSelectedSymbol] = useState('BTCUSD'); // Default symbol
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -26,9 +29,20 @@ function App() {
         <ChartContainer 
           isSidebarOpen={isSidebarOpen} 
           toggleSidebar={toggleSidebar} 
+          currentInterval={currentInterval}
+          selectedSymbol={selectedSymbol}
+          setCurrentInterval={setCurrentInterval}
         />
       </div>
       <Footer />
+
+      {/* Global Quick Search */}
+      <QuickSearch 
+        intervals={['1m', '5m', '15m', '30m', '1H', '4H', '1D', '1W', '1M']} 
+        setInterval={setCurrentInterval} 
+        currentInterval={currentInterval}
+        onSymbolSelect={setSelectedSymbol} 
+      />
     </div>
   );
 }

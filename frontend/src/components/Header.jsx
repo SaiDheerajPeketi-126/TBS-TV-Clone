@@ -1,7 +1,7 @@
 import React from 'react';
 import { SearchIcon, BellIcon, ChevronDownIcon, UserIcon, CogIcon } from './Icons';
 
-function Header() {
+function Header({ setInterval, onSymbolSelect }) {
   return (
     <header className="h-14 flex items-center justify-between px-4 bg-gray-800 border-b border-gray-700">
       <div className="flex items-center">
@@ -15,24 +15,24 @@ function Header() {
       </div>
       
       <div className="flex items-center space-x-4">
-        <div className="relative">
+        {/* <div className="relative">
           <input 
             type="text" 
             placeholder="Symbol Search" 
             className="bg-gray-700 text-sm rounded px-3 py-1.5 w-56 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <SearchIcon className="absolute right-3 top-2 h-4 w-4 text-gray-400" />
-        </div>
+        </div> */}
         
         <button className="p-1.5 hover:bg-gray-700 rounded-full">
           <BellIcon className="h-5 w-5" />
         </button>
         
-        <div className="flex items-center space-x-1 px-2 py-1 hover:bg-gray-700 rounded cursor-pointer">
+        {/* <div className="flex items-center space-x-1 px-2 py-1 hover:bg-gray-700 rounded cursor-pointer">
           <UserIcon className="h-5 w-5" />
           <span className="text-sm hidden md:inline">Profile</span>
           <ChevronDownIcon className="h-4 w-4" />
-        </div>
+        </div> */}
         
         <button className="p-1.5 hover:bg-gray-700 rounded-full">
           <CogIcon className="h-5 w-5" />

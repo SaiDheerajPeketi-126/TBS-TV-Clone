@@ -4,13 +4,12 @@ import { generateMockData } from '../utils/mockData';
 import ChartToolbar from './ChartToolbar';
 import ChartHeader from './ChartHeader';
 
-function ChartContainer({ isSidebarOpen, toggleSidebar }) {
+function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selectedSymbol, setCurrentInterval }) {
   const chartContainerRef = useRef(null);
   const fullScreenContainerRef = useRef(null);
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
-  const [interval, setInterval] = useState('1D');
   const [chartStyle, setChartStyle] = useState('candles');
   const [chartData, setChartData] = useState(null);
   const [highlightedCandle, setHighlightedCandle] = useState({
@@ -76,7 +75,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
     chartRef.current = createChart(chartContainerRef.current, chartOptions);
     
     // Generate and store data
-    const data = generateMockData(interval);
+    const data = generateMockData(currentInterval);
     setChartData(data);
 
     // Add volume series (stays consistent across chart types)
@@ -140,7 +139,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
       chartRef.current.remove();
       window.removeEventListener('resize', handleResize);
     };
-  }, [interval, isFullscreen]);
+  }, [currentInterval, selectedSymbol, isFullscreen]);
 
   // Update volume scale when chart data changes
   useEffect(() => {
@@ -357,7 +356,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden" ref={fullScreenContainerRef}>
       <ChartHeader 
-        symbol="BTC/USD" 
+        symbol={selectedSymbol}
         price={`O: ${highlightedCandle.open} H: ${highlightedCandle.high} L: ${highlightedCandle.low} C: ${highlightedCandle.close}`} 
         change={highlightedCandle.change} 
         toggleSidebar={toggleSidebar}
@@ -366,8 +365,8 @@ function ChartContainer({ isSidebarOpen, toggleSidebar }) {
         isFullscreen={isFullscreen}
       />
       <ChartToolbar 
-        interval={interval} 
-        setInterval={setInterval} 
+        interval={currentInterval} 
+        setInterval={setCurrentInterval}
         chartStyle={chartStyle} 
         setChartStyle={setChartStyle} 
       />

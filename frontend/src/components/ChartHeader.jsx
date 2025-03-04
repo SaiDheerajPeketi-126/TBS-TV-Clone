@@ -1,7 +1,7 @@
 import React from 'react';
 import { StarIcon } from './Icons';
 
-function ChartHeader({ symbol, price, change, toggleSidebar, isSidebarOpen, toggleFullscreen, isFullscreen }) {
+function ChartHeader({ symbol="BTCUSD", price, change, toggleSidebar, isSidebarOpen, toggleFullscreen, isFullscreen }) {
   return (
     <div className="h-14 border-b border-gray-700 flex items-center justify-between px-4">
       <div className="flex items-center space-x-3">
