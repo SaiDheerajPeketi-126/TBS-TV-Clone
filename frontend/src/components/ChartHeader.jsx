@@ -1,7 +1,20 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { StarIcon } from './Icons';
+import { WatchlistContext } from './WatchlistContext';
 
 function ChartHeader({ symbol="BTCUSD", price, change, toggleSidebar, isSidebarOpen, toggleFullscreen, isFullscreen }) {
+  const { toggleInWatchlist, isInWatchlist } = useContext(WatchlistContext);
+  
+  const isStarred = isInWatchlist(symbol);
+  
+  const handleStarClick = () => {
+    toggleInWatchlist({
+      name: symbol,
+      price: price || '0.00',
+      change: change || 0
+    });
+  };
+
   return (
     <div className="h-14 border-b border-gray-700 flex items-center justify-between px-4">
       <div className="flex items-center space-x-3">
@@ -22,8 +35,12 @@ function ChartHeader({ symbol="BTCUSD", price, change, toggleSidebar, isSidebarO
         
         <div className="flex items-center space-x-2">
           <span className="font-semibold text-lg">{symbol}</span>
-          <button className="p-1 hover:bg-gray-700 rounded">
-            <StarIcon className="h-4 w-4 text-yellow-400" />
+          <button 
+            className="p-1 hover:bg-gray-700 rounded"
+            onClick={handleStarClick}
+            title={isStarred ? "Remove from watchlist" : "Add to watchlist"}
+          >
+            <StarIcon className={`h-4 w-4 ${isStarred ? "text-yellow-400" : "text-gray-400"}`} />
           </button>
         </div>
         
@@ -48,10 +65,6 @@ function ChartHeader({ symbol="BTCUSD", price, change, toggleSidebar, isSidebarO
             )}
           </svg>
         </button>
-        
-        {/* <button className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm">
-          Buy / Sell
-        </button> */}
       </div>
     </div>
   );
