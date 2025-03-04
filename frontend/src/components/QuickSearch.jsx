@@ -16,6 +16,8 @@ function QuickSearch({
   const resultsRef = useRef(null);
   const selectedItemRef = useRef(null);
 
+  // For timeframe grid navigation
+  const COLUMNS_PER_ROW = 4;
   
   // Mock symbols for demo purposes
   const mockSymbols = [
@@ -95,15 +97,85 @@ function QuickSearch({
   
   // Handle keydown for navigation and selection
   const handleKeyDown = (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex(prev => 
-        prev < searchResults.length - 1 ? prev + 1 : prev
-      );
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex(prev => prev > 0 ? prev - 1 : 0);
-    } else if (e.key === 'Enter' && searchResults.length > 0) {
+    if (searchResults.length === 0) return;
+    
+    if (searchType === 'timeframe') {
+      // Grid navigation for timeframes
+      const totalRows = Math.ceil(searchResults.length / COLUMNS_PER_ROW);
+      const currentRow = Math.floor(selectedIndex / COLUMNS_PER_ROW);
+      const currentCol = selectedIndex % COLUMNS_PER_ROW;
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        // Move to the next row, same column
+        const nextRowIndex = (currentRow + 1) % totalRows;
+        const nextIndex = nextRowIndex * COLUMNS_PER_ROW + currentCol;
+        
+        // Stay within bounds
+        if (nextIndex < searchResults.length) {
+          setSelectedIndex(nextIndex);
+        } else {
+          // If we would go out of bounds, wrap to the first row
+          setSelectedIndex(currentCol);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        // Move to the previous row, same column
+        const prevRowIndex = (currentRow - 1 + totalRows) % totalRows;
+        const prevIndex = prevRowIndex * COLUMNS_PER_ROW + currentCol;
+        
+        // Stay within bounds
+        if (prevIndex < searchResults.length) {
+          setSelectedIndex(prevIndex);
+        } else {
+          // If we would go out of bounds, stay in the same position
+          setSelectedIndex(selectedIndex);
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        // Move to the next column, same row
+        const nextColIndex = (currentCol + 1) % COLUMNS_PER_ROW;
+        const nextIndex = currentRow * COLUMNS_PER_ROW + nextColIndex;
+        
+        // Stay within bounds
+        if (nextIndex < searchResults.length) {
+          setSelectedIndex(nextIndex);
+        } else {
+          // If we would go out of bounds, wrap to the next row
+          const nextRowIndex = (currentRow + 1) % totalRows;
+          setSelectedIndex(nextRowIndex * COLUMNS_PER_ROW);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        // Move to the previous column, same row
+        const prevColIndex = (currentCol - 1 + COLUMNS_PER_ROW) % COLUMNS_PER_ROW;
+        const prevIndex = currentRow * COLUMNS_PER_ROW + prevColIndex;
+        
+        // Stay within bounds
+        if (prevIndex < searchResults.length && currentCol > 0) {
+          setSelectedIndex(prevIndex);
+        } else if (currentCol === 0) {
+          // If we're at the leftmost column, wrap to the previous row
+          const prevRowIndex = (currentRow - 1 + totalRows) % totalRows;
+          const lastColInPrevRow = Math.min(COLUMNS_PER_ROW - 1, searchResults.length - prevRowIndex * COLUMNS_PER_ROW - 1);
+          setSelectedIndex(prevRowIndex * COLUMNS_PER_ROW + lastColInPrevRow);
+        }
+      }
+    } else {
+      // Standard list navigation for symbols
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev < searchResults.length - 1 ? prev + 1 : prev
+        );
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : 0);
+      }
+    }
+    
+    // Enter key works the same for both
+    if (e.key === 'Enter' && searchResults.length > 0) {
       e.preventDefault();
       handleSelection(searchResults[selectedIndex]);
     }
@@ -172,6 +244,7 @@ function QuickSearch({
                       {searchResults.map((interval, index) => (
                         <div
                           key={interval}
+                          ref={index === selectedIndex ? selectedItemRef : null}
                           className={`px-3 py-2 rounded cursor-pointer text-center ${
                             selectedIndex === index ? 'bg-blue-600' : 'hover:bg-gray-700'
                           } ${currentInterval === interval ? 'text-blue-400' : 'text-white'}`}
@@ -212,11 +285,21 @@ function QuickSearch({
             )}
             
             <div className="px-4 py-2 bg-gray-900 text-xs text-gray-400 flex justify-between">
-              <div>
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">↑</kbd>
-                <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">↓</kbd>
-                to navigate
-              </div>
+              {searchType === 'timeframe' ? (
+                <div>
+                  <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">←</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">→</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">↑</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">↓</kbd>
+                  to navigate
+                </div>
+              ) : (
+                <div>
+                  <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">↑</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">↓</kbd>
+                  to navigate
+                </div>
+              )}
               <div>
                 <kbd className="px-1.5 py-0.5 bg-gray-800 rounded mr-1">Enter</kbd>
                 to select

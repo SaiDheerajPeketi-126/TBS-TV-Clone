@@ -6,7 +6,7 @@ import Footer from './components/Footer';
 import QuickSearch from './components/QuickSearch';
 
 function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentInterval, setCurrentInterval] = useState('1D'); // Default timeframe
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSD'); // Default symbol
 
