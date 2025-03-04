@@ -14,6 +14,8 @@ function QuickSearch({
   const [searchType, setSearchType] = useState(null); // 'timeframe' or 'symbol'
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
+  const selectedItemRef = useRef(null);
+
   
   // Mock symbols for demo purposes
   const mockSymbols = [
@@ -106,6 +108,13 @@ function QuickSearch({
       handleSelection(searchResults[selectedIndex]);
     }
   };
+
+  // Auto-scroll selected item into view
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [selectedIndex]);
   
   // Handle selection
   const handleSelection = (item) => {
@@ -180,6 +189,7 @@ function QuickSearch({
                     {searchResults.map((item, index) => (
                       <div
                         key={item.symbol}
+                        ref={index === selectedIndex ? selectedItemRef : null} // Attach ref to selected item
                         className={`px-4 py-2 cursor-pointer flex justify-between items-center ${
                           selectedIndex === index ? 'bg-blue-600' : 'hover:bg-gray-700'
                         }`}
