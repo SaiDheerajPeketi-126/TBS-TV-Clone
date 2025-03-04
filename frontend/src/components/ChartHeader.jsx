@@ -8,9 +8,20 @@ function ChartHeader({ symbol="BTCUSD", price, change, toggleSidebar, isSidebarO
   const isStarred = isInWatchlist(symbol);
   
   const handleStarClick = () => {
+    // Extract the closing price from the price string
+    // Format is "O: 34025.99 H: 34295.18 L: 33492.03 C: 33931.83"
+    let closePrice = '0.00';
+    
+    if (price) {
+      const closePriceMatch = price.match(/C:\s*(\d+\.\d+)/);
+      if (closePriceMatch && closePriceMatch[1]) {
+        closePrice = closePriceMatch[1];
+      }
+    }
+    
     toggleInWatchlist({
       name: symbol,
-      price: price || '0.00',
+      price: closePrice,
       change: change || 0
     });
   };
@@ -44,7 +55,7 @@ function ChartHeader({ symbol="BTCUSD", price, change, toggleSidebar, isSidebarO
           </button>
         </div>
         
-        <div className={change >= 0 ? "text-green-500" : "text-red-500"}>{price}</div>
+        <div className="text-white">{price}</div>
         <div className={change >= 0 ? "text-green-500" : "text-red-500"}>
           {change >= 0 ? "+" : ""}{change}%
         </div>

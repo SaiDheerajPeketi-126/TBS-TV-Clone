@@ -4,8 +4,8 @@ import React, { createContext, useState, useEffect } from 'react';
 const initialWatchlistData = {
   lists: {
     'Default': [],
-    'Crypto': [],
-    'Forex': []
+    // 'Crypto': [],
+    // 'Forex': []
   },
   activeList: 'Default'
 };
