@@ -1,6 +1,7 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { StarIcon, EyeIcon, HistoryIcon, LayersIcon, GridIcon } from './Icons';
 import { WatchlistContext } from './WatchlistContext';
+import CustomWatchlistModal from './CustomWatchlistModal';
 
 function Sidebar({ onSymbolSelect }) {
   const { 
@@ -11,6 +12,8 @@ function Sidebar({ onSymbolSelect }) {
     watchlists, 
     activeWatchlist 
   } = useContext(WatchlistContext);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Function to handle when a symbol is clicked
   const handleSymbolClick = (symbol) => {
@@ -25,10 +28,9 @@ function Sidebar({ onSymbolSelect }) {
   };
 
   // Function to add a new watchlist
-  const addNewWatchlist = () => {
-    const newListName = prompt("Enter watchlist name:");
-    if (newListName && !watchlists[newListName]) {
-      createWatchlist(newListName);
+  const handleCreateWatchlist = (watchlistName) => {
+    if (watchlistName && !watchlists[watchlistName]) {
+      createWatchlist(watchlistName);
     }
   };
   
@@ -60,7 +62,7 @@ function Sidebar({ onSymbolSelect }) {
           ))}
           <button 
             className="px-3 py-1 rounded-md whitespace-nowrap bg-gray-700 hover:bg-gray-600"
-            onClick={addNewWatchlist}
+            onClick={() => setIsModalOpen(true)}
           >
             + New
           </button>
@@ -120,6 +122,13 @@ function Sidebar({ onSymbolSelect }) {
           </button>
         </div>
       </div>
+      
+      {/* Custom modal for creating a new watchlist */}
+      <CustomWatchlistModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={handleCreateWatchlist}
+      />
     </div>
   );
 }
