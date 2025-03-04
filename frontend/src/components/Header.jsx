@@ -1,5 +1,6 @@
 import React from 'react';
-import { SearchIcon, BellIcon, ChevronDownIcon, UserIcon, CogIcon } from './Icons';
+import { BellIcon, ChevronDownIcon, UserIcon, CogIcon } from './Icons';
+import QuickSearch from './QuickSearch';
 
 function Header({ setInterval, onSymbolSelect }) {
   return (
@@ -15,24 +16,19 @@ function Header({ setInterval, onSymbolSelect }) {
       </div>
       
       <div className="flex items-center space-x-4">
-        {/* <div className="relative">
-          <input 
-            type="text" 
-            placeholder="Symbol Search" 
-            className="bg-gray-700 text-sm rounded px-3 py-1.5 w-56 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        {/* QuickSearch component placed here instead of at bottom of screen */}
+        <div className="relative w-56">
+          <QuickSearch 
+            intervals={['1m', '5m', '15m', '30m', '1H', '4H', '1D', '1W', '1M']} 
+            setInterval={setInterval} 
+            currentInterval={null}  // Will be properly passed from App.jsx
+            onSymbolSelect={onSymbolSelect} 
           />
-          <SearchIcon className="absolute right-3 top-2 h-4 w-4 text-gray-400" />
-        </div> */}
+        </div>
         
         <button className="p-1.5 hover:bg-gray-700 rounded-full">
           <BellIcon className="h-5 w-5" />
         </button>
-        
-        {/* <div className="flex items-center space-x-1 px-2 py-1 hover:bg-gray-700 rounded cursor-pointer">
-          <UserIcon className="h-5 w-5" />
-          <span className="text-sm hidden md:inline">Profile</span>
-          <ChevronDownIcon className="h-4 w-4" />
-        </div> */}
         
         <button className="p-1.5 hover:bg-gray-700 rounded-full">
           <CogIcon className="h-5 w-5" />
