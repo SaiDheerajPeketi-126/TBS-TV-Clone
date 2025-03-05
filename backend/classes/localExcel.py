@@ -36,7 +36,7 @@ class LocalExcel:
                     try:
                         temp_str = i.split("_")
                         temp_stock = temp_str[2]
-                        stock_list.append(temp_stock.split(".")[0])
+                        stock_list.append({'name':temp_stock.split(".")[0],'symbol':temp_str[1]})
                     except Exception as e:
                         print(f"Error parsing filename {i}: {e}")
                 
