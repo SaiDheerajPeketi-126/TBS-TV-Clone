@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any
@@ -10,6 +10,8 @@ import os
 import requests
 
 from classes.localExcel import LocalExcel
+from classes.smartAPI import download_stock_data,read_credentials,login,update_symbol_excel
+
 
 app = FastAPI()
 
@@ -30,13 +32,14 @@ class BacktestRequest(BaseModel):
     strategy: str
     parameters: Dict[str, Any]
 
-@app.get("/api/search")
+@app.get("/api/search/")
 async def get_all_sheets(path: str = "../sheets"):
     
-    localexcel = LocalExcel(path=path)
-    return localexcel.get_all_local()
+    return LocalExcel.get_all_local(path=path)
 
-
+@app.get("/api/get_stock_list")
+async def get_stock_list():
+    return LocalExcel.get_all_possible()
 
 @app.get("/api/data")
 async def get_market_data(stock_exchange:str,stock_symbol:str ,path :str = "../sheets",stock_time_frame:int = 1):
@@ -46,9 +49,8 @@ async def get_market_data(stock_exchange:str,stock_symbol:str ,path :str = "../s
     Then returns the requested date range in a format suitable for the frontend.
     """
     
-    localexcel = LocalExcel(path=path)
     try:
-        return localexcel.search_for_stock(stock_exchange=stock_exchange,stock_symbol=stock_symbol,stock_time_frame = stock_time_frame)
+        return LocalExcel.search_for_stock(stock_exchange=stock_exchange,stock_symbol=stock_symbol,stock_time_frame = stock_time_frame,path=path)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -137,248 +139,70 @@ def tradingview_technical_analysis():
     # print(data)
     return data
 
-
-
-def moving_average_strategy(data: pd.DataFrame):
-    return data["volume"].mean(),data["volume"].median()
-
-
-def rsi_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
-    period = parameters.get("period", 14)
-    overbought = parameters.get("overbought", 70)
-    oversold = parameters.get("oversold", 30)
-    
-    # Calculate RSI
-    delta = data["Close"].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
-    
-    avg_gain = gain.rolling(window=period).mean()
-    avg_loss = loss.rolling(window=period).mean()
-    
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    data["RSI"] = rsi
-    
-    # Generate signals
-    data["signal"] = 0
-    data.loc[data["RSI"] < oversold, "signal"] = 1  # Buy
-    data.loc[data["RSI"] > overbought, "signal"] = -1  # Sell
-    
-    # Calculate positions
-    data["position"] = 0
-    position = 0
-    for i in range(1, len(data)):
-        if data["signal"].iloc[i] == 1 and position <= 0:
-            position = 1
-        elif data["signal"].iloc[i] == -1 and position >= 0:
-            position = -1
-        data["position"].iloc[i] = position
-    
-    # Calculate trades
-    trades = []
-    current_position = 0
-    entry_price = 0
-    entry_time = None
-    
-    for index, row in data.iterrows():
-        if row["position"] > current_position:  # Buy
-            current_position = 1
-            entry_price = row["Close"]
-            entry_time = index
-            trades.append({
-                "type": "buy",
-                "time": index.isoformat(),
-                "price": float(entry_price),
-                "profit": None
-            })
-        elif row["position"] < current_position:  # Sell
-            if current_position > 0:  # Close long
-                profit = row["Close"] - entry_price
-                trades.append({
-                    "type": "sell",
-                    "time": index.isoformat(),
-                    "price": float(row["Close"]),
-                    "profit": float(profit),
-                    "entryTime": entry_time.isoformat()
-                })
-            current_position = -1
-            entry_price = row["Close"]
-            entry_time = index
-    
-    # Calculate returns
-    data["returns"] = data["Close"].pct_change()
-    data["strategy_returns"] = data["position"].shift(1) * data["returns"]
-    
-    # Calculate metrics
-    starting_balance = 10000
-    cumulative_returns = (1 + data["strategy_returns"].fillna(0)).cumprod()
-    ending_balance = starting_balance * cumulative_returns.iloc[-1]
-    
-    winning_trades = len([t for t in trades if t.get("profit", 0) > 0])
-    losing_trades = len([t for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) <= 0])
-    total_trades = winning_trades + losing_trades
-    win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-    
-    cumulative_max = cumulative_returns.cummax()
-    drawdown = (cumulative_returns / cumulative_max - 1) * 100
-    max_drawdown = abs(drawdown.min())
-    
-    if data["strategy_returns"].std() == 0:
-        sharpe_ratio = 0
-    else:
-        sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)
-    
-    gross_profit = sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) > 0])
-    gross_loss = abs(sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) < 0]))
-    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
-    
-    return {
-        "totalTrades": total_trades,
-        "winningTrades": winning_trades,
-        "losingTrades": losing_trades,
-        "winRate": win_rate,
-        "profitFactor": profit_factor,
-        "netProfit": float(ending_balance - starting_balance),
-        "maxDrawdown": float(max_drawdown),
-        "sharpeRatio": float(sharpe_ratio),
-        "startingBalance": starting_balance,
-        "endingBalance": float(ending_balance),
-        "trades": trades
-    }
-
-def custom_strategy(data: pd.DataFrame, parameters: Dict[str, Any]):
-    code = parameters.get("code", "")
-    
-    # Add some commonly used indicators
-    data["sma_9"] = data["Close"].rolling(window=9).mean()
-    data["sma_21"] = data["Close"].rolling(window=21).mean()
-    data["ema_9"] = data["Close"].ewm(span=9, adjust=False).mean()
-    data["ema_21"] = data["Close"].ewm(span=21, adjust=False).mean()
-    
-    # Calculate RSI
-    delta = data["Close"].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
-    avg_gain = gain.rolling(window=14).mean()
-    avg_loss = loss.rolling(window=14).mean()
-    rs = avg_gain / avg_loss
-    data["rsi_14"] = 100 - (100 / (1 + rs))
-    
-    # Create buy_signal and sell_signal arrays
-    buy_signals = np.zeros(len(data))
-    sell_signals = np.zeros(len(data))
-    
-    # Execute user code safely
+@app.get("/api/smartAPI/download")
+async def download_data(request: Request):
+    # print(request.json())
     try:
-        local_env = {
-            "df": data,
-            "np": np,
-            "pd": pd,
-            "buy_signals": buy_signals,
-            "sell_signals": sell_signals
-        }
-        exec(code, {}, local_env)
-        buy_signals = local_env.get("buy_signals", buy_signals)
-        sell_signals = local_env.get("sell_signals", sell_signals)
+        params =  await request.json()  # Read raw JSON from request
+        print(params)
+        required_keys = [ "exchange", "symbol", "interval", "from_date", "to_date"]
+        if not all(key in params for key in required_keys):
+            raise HTTPException(status_code=400, detail="Missing required parameters")
+
+        creds = read_credentials("../credentials.txt")
+        # Call the function with extracted parameters
+        data = download_stock_data(
+            creds["api_key"],
+            creds["client_id"],
+            creds["pin"],
+            creds["qr_token"],
+            params["exchange"],
+            params["symbol"],
+            params["interval"],
+            params["from_date"],
+            params["to_date"],
+            params["path"]
+            
+        )
+
+        if data is not None:
+            return data
+        else:
+            raise HTTPException(status_code=500, detail="Failed to fetch stock data")
+
     except Exception as e:
-        return {
-            "error": str(e),
-            "totalTrades": 0,
-            "winningTrades": 0,
-            "losingTrades": 0,
-            "winRate": 0,
-            "profitFactor": 0,
-            "netProfit": 0,
-            "maxDrawdown": 0,
-            "sharpeRatio": 0,
-            "startingBalance": 10000,
-            "endingBalance": 10000,
-            "trades": []
-        }
-    
-    # Calculate positions and trades
-    position = 0
-    trades = []
-    entry_price = 0
-    entry_time = None
-    
-    for i, index in enumerate(data.index):
-        if buy_signals[i] and position <= 0:
-            position = 1
-            entry_price = data["Close"].iloc[i]
-            entry_time = index
-            trades.append({
-                "type": "buy",
-                "time": index.isoformat(),
-                "price": float(entry_price),
-                "profit": None
-            })
-        elif sell_signals[i] and position >= 0:
-            if position > 0:
-                profit = data["Close"].iloc[i] - entry_price
-                trades.append({
-                    "type": "sell",
-                    "time": index.isoformat(),
-                    "price": float(data["Close"].iloc[i]),
-                    "profit": float(profit),
-                    "entryTime": entry_time.isoformat()
-                })
-            position = -1
-            entry_price = data["Close"].iloc[i]
-            entry_time = index
-    
-    # Strategy returns
-    position_array = np.zeros(len(data))
-    current_position = 0
-    for i in range(len(data)):
-        if buy_signals[i] and current_position <= 0:
-            current_position = 1
-        elif sell_signals[i] and current_position >= 0:
-            current_position = -1
-        position_array[i] = current_position
-    
-    data["position"] = position_array
-    data["returns"] = data["Close"].pct_change()
-    data["strategy_returns"] = data["position"].shift(1) * data["returns"]
-    
-    # Calculate metrics
-    starting_balance = 10000
-    cumulative_returns = (1 + data["strategy_returns"].fillna(0)).cumprod()
-    ending_balance = starting_balance * cumulative_returns.iloc[-1]
-    
-    winning_trades = len([t for t in trades if t.get("profit", 0) > 0])
-    losing_trades = len([t for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) <= 0])
-    total_trades = winning_trades + losing_trades
-    win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-    
-    cumulative_max = cumulative_returns.cummax()
-    drawdown = (cumulative_returns / cumulative_max - 1) * 100
-    max_drawdown = abs(drawdown.min())
-    
-    if data["strategy_returns"].std() == 0:
-        sharpe_ratio = 0
-    else:
-        sharpe_ratio = data["strategy_returns"].mean() / data["strategy_returns"].std() * (252 ** 0.5)
-    
-    gross_profit = sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) > 0])
-    gross_loss = abs(sum([t.get("profit", 0) for t in trades if t.get("profit", 0) is not None and t.get("profit", 0) < 0]))
-    profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
-    
-    return {
-        "totalTrades": total_trades,
-        "winningTrades": winning_trades,
-        "losingTrades": losing_trades,
-        "winRate": win_rate,
-        "profitFactor": profit_factor,
-        "netProfit": float(ending_balance - starting_balance),
-        "maxDrawdown": float(max_drawdown),
-        "sharpeRatio": float(sharpe_ratio),
-        "startingBalance": starting_balance,
-        "endingBalance": float(ending_balance),
-        "trades": trades
-    }
+        raise HTTPException(status_code=500, detail=str(e))
+    # # Example Usage
+    # exchange = params["exchange"] #"NSE"
+    # symbol = params["symbol"]#RELIANCE"
+    # interval = params["interval"]#DAILY"
+    # from_date = params["from_date"]#2024-03-01 09:15"
+    # to_date = params["to_date"]#2024-03-05 15:30"
+
+    # # Fetch stock data
+    # df = download_stock_data(
+    #     creds["api_key"],
+    #     creds["client_id"],
+    #     creds["pin"],
+    #     creds["qr_token"],
+    #     exchange,
+    #     symbol,
+    #     interval,
+    #     from_date,
+    #     to_date
+    # )
+
+    # # Display the DataFrame
+    # if df is not None:
+    #     return df.to_json()
+    # else:
+    #     print("Failed to fetch stock data.")
+    # return data
 
 if __name__ == "__main__":
     import uvicorn
+    # creds = read_credentials("../credentials.txt")
+    # jwtToken = login(creds["qr_token"],creds["client_id"],creds["pin"],creds["api_key"])
+    # update_symbol_excel()
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

@@ -5,55 +5,72 @@ from datetime import datetime
 
 class LocalExcel:
     '''
-    
+    All Local File Operations
     '''
-    def __init__(self,path):
+    def __init__(self):
         '''
         
         '''
-        self.path = path
+
+    def get_all_possible():
+        try:
+            stock_list = []
+            for root, dirs, files in os.walk("./data"):
+                # Filter only Excel files
+                excel_files = [f for f in files if f.endswith((".xlsx", ".xls"))]
+                
+                for i in excel_files:
+                    df = pd.read_excel(os.path.join(root,i),index_col=False)
+                    for row in df.iterrows():
+                        stock_list.append({'name':row["name"],'symbol':row["symbol"],'exchange':row["exch_seg"]})
+
+            if len(df) == 0: return None
+            return stock_list
+        except Exception as e:
+            return {"error": str(e)}
+        
 
 
-    def get_all_local(self, path=None):
+    def get_all_local(path):
         """
         Recursively retrieves all Excel files in the given directory.
         Returns a dictionary mapping folder names to stock names from Excel files.
         """
-        if path is None:
-            path = self.path
+        if path is None or path == '':
+            return {"error":"Path cannot be Empty"}
 
-        folder_stock_map = {}
-        
+        stock_list = []
         try:
             for root, dirs, files in os.walk(path):
                 folder_name = os.path.basename(root)
                 
                 # Filter only Excel files
                 excel_files = [f for f in files if f.endswith((".xlsx", ".xls"))]
-                stock_list = []
+                
                 
                 for i in excel_files:
                     try:
                         temp_str = i.split("_")
                         temp_stock = temp_str[2]
-                        stock_list.append({'name':temp_stock.split(".")[0],'symbol':temp_str[1]})
+                        stock_list.append({'name':temp_stock.split(".")[0],'symbol':temp_str[1],'exchange':folder_name})
                     except Exception as e:
                         print(f"Error parsing filename {i}: {e}")
                 
-                if stock_list:
-                    folder_stock_map[folder_name] = stock_list
+            if stock_list:
+                return stock_list
             
-            return folder_stock_map
+            return {"error": "Empty Folder"}
         
         except Exception as e:
             return {"error": str(e)}
 
     
-    def search_for_stock(self,stock_exchange,stock_symbol,path = None,stock_time_frame = 1):
+    def search_for_stock(stock_exchange,stock_symbol,path,stock_time_frame = 1):
         '''
         
         '''
-        if path is None: path = self.path
+        if path is None or path == '':
+            return {"error":"Path cannot be Empty"}
         try:
             # Read data from Excel
             path = path+"/"+stock_exchange
@@ -69,9 +86,10 @@ class LocalExcel:
                     for i in excel_files:
                         try:
                             temp_str = i.split("_")
-                            temp_stock = temp_str[2]
-                            if temp_stock.split(".")[0] == stock_symbol:
+                            temp_stock = temp_str[1]
+                            if temp_stock == stock_symbol:
                                 path += "/" + i
+                                break
 
                         except Exception as e:
                             print(f"Error parsing filename {i}: {e}")

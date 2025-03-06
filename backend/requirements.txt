@@ -1,6 +1,10 @@
 fastapi==0.115.11
-numpy==1.24.3
+logzero==1.7.0
+numpy==1.24.4
 pandas==2.0.3
 pydantic==1.10.8
+pyotp==2.9.0
 Requests==2.32.3
+SmartApi==1.1.0
+smartapi_python==1.4.9
 uvicorn==0.34.0
