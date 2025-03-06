@@ -5,22 +5,21 @@ from datetime import datetime
 
 class LocalExcel:
     '''
-    
+    All Local File Operations
     '''
-    def __init__(self,path):
+    def __init__(self):
         '''
         
         '''
-        self.path = path
 
 
-    def get_all_local(self, path=None):
+    def get_all_local(path):
         """
         Recursively retrieves all Excel files in the given directory.
         Returns a dictionary mapping folder names to stock names from Excel files.
         """
-        if path is None:
-            path = self.path
+        if path is None or path == '':
+            return {"error":"Path cannot be Empty"}
 
         folder_stock_map = {}
         
@@ -49,11 +48,12 @@ class LocalExcel:
             return {"error": str(e)}
 
     
-    def search_for_stock(self,stock_exchange,stock_symbol,path = None,stock_time_frame = 1):
+    def search_for_stock(stock_exchange,stock_symbol,path,stock_time_frame = 1):
         '''
         
         '''
-        if path is None: path = self.path
+        if path is None or path == '':
+            return {"error":"Path cannot be Empty"}
         try:
             # Read data from Excel
             path = path+"/"+stock_exchange
