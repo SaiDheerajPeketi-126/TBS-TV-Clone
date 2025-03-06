@@ -193,7 +193,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         // Try to fetch data from API
         data = await fetchChartData(
           'NSE',
-          '',
+          'TRIVENI',
           convertIntervalToMinutes(currentInterval),
           API_CONFIG.STOCK_DATA_PATH
         );
