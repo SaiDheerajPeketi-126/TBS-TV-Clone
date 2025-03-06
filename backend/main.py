@@ -159,6 +159,7 @@ async def download_data(request: Request):
             params["interval"],
             params["from_date"],
             params["to_date"],
+            params["path"]
             
         )
 

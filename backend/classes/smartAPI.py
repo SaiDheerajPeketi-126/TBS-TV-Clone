@@ -4,6 +4,7 @@ import pyotp
 from logzero import logger
 import requests
 import json
+import os
 
 def read_credentials(file_path):
     credentials = {}
@@ -13,11 +14,19 @@ def read_credentials(file_path):
             credentials[key] = value
     return credentials
 
-def df_to_excel(df,exchange,symbol):
+def df_to_excel(df,exchange,symbol,name,path):
     '''
     
     '''
-    pass
+    print("1")
+    filename = os.path.join(path,exchange)
+    os.makedirs(filename, exist_ok=True)
+    filename = os.path.join(filename,f"{exchange}_{symbol}_{name}.xlsx")
+    df.to_excel(filename, index=False)
+
+    
+
+    
 
 # def download_stock_data(api_key, client_id, pin, qr_token, exchange, symbol, interval, from_date, to_date):
 #     """
@@ -84,7 +93,7 @@ def df_to_excel(df,exchange,symbol):
 #         return None
 # 
     
-def download_stock_data(api_key, client_id, pin, qr_token, exchange, symbol, interval, from_date, to_date,jwtToken=None):
+def download_stock_data(api_key, client_id, pin, qr_token, exchange, symbol, interval, from_date, to_date,path,jwtToken=None):
     """
     Fetches historical stock data from AngelOne's SmartAPI.
     
@@ -116,8 +125,8 @@ def download_stock_data(api_key, client_id, pin, qr_token, exchange, symbol, int
     
     # symboltoken = get_token(exchange=exchange,symbol=symbol,jwtToken=jwtToken)
     # if symboltoken is None: return {"error" : f"{symboltoken} is Empty"}
-    symboltoken = get_symbol_from_excel(exchange=exchange,symbol=symbol)
-    print(symboltoken)
+    symboltoken,name = get_symbol_from_excel(exchange=exchange,symbol=symbol)
+    # print(symboltoken)
     try:
         historicParam={
         "exchange": exchange,
@@ -132,7 +141,8 @@ def download_stock_data(api_key, client_id, pin, qr_token, exchange, symbol, int
         if response["status"] and "data" in response:
             data = response["data"]
             df = pd.DataFrame(data, columns=["timestamp", "open", "high", "low", "close", "volume"])
-            
+            df_to_excel(df=df,exchange=exchange,symbol=symbol,name = name,path =path)
+            return df.to_json()
     except Exception as e:
         logger.exception(f"Historic Api failed: {e}")
         return {"error" : e}
@@ -218,8 +228,7 @@ def get_symbol_from_excel(exchange,symbol):
     '''
     
     '''
-    import os
-
+    
     path = "data"
     try:
         for root, dirs, files in os.walk(path):
@@ -237,15 +246,16 @@ def get_symbol_from_excel(exchange,symbol):
         df = pd.read_excel(path,index_col=False)
         if len(df) == 0: return None
         token = df[df["symbol"]==symbol]["token"].values[0]
-        print(token)
-        return str(token)
+        print(3)
+        name = df[df["symbol"]==symbol]["name"].values[0]
+        print(4)
+        # print(token)
+        return str(token),name
     except Exception as e:
         return {"error": str(e)}
     
 def update_symbol_excel():
-    import pandas as pd
     import requests
-    import os
 
     # Your JSON data
     api_url = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json'
