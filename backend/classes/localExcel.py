@@ -21,28 +21,27 @@ class LocalExcel:
         if path is None or path == '':
             return {"error":"Path cannot be Empty"}
 
-        folder_stock_map = {}
-        
+        stock_list = []
         try:
             for root, dirs, files in os.walk(path):
                 folder_name = os.path.basename(root)
                 
                 # Filter only Excel files
                 excel_files = [f for f in files if f.endswith((".xlsx", ".xls"))]
-                stock_list = []
+                
                 
                 for i in excel_files:
                     try:
                         temp_str = i.split("_")
                         temp_stock = temp_str[2]
-                        stock_list.append({'name':temp_stock.split(".")[0],'symbol':temp_str[1]})
+                        stock_list.append({'name':temp_stock.split(".")[0],'symbol':temp_str[1],'exchange':folder_name})
                     except Exception as e:
                         print(f"Error parsing filename {i}: {e}")
                 
-                if stock_list:
-                    folder_stock_map[folder_name] = stock_list
+            if stock_list:
+                return stock_list
             
-            return folder_stock_map
+            return {"error": "Empty Folder"}
         
         except Exception as e:
             return {"error": str(e)}
@@ -69,9 +68,10 @@ class LocalExcel:
                     for i in excel_files:
                         try:
                             temp_str = i.split("_")
-                            temp_stock = temp_str[2]
-                            if temp_stock.split(".")[0] == stock_symbol:
+                            temp_stock = temp_str[1]
+                            if temp_stock == stock_symbol:
                                 path += "/" + i
+                                break
 
                         except Exception as e:
                             print(f"Error parsing filename {i}: {e}")
