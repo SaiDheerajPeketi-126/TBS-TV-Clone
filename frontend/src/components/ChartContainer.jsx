@@ -107,14 +107,14 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     // Calculate average volume to set a more appropriate scale
     const averageVolume = data.reduce((sum, item) => sum + item.volume, 0) / data.length;
     const maxVolume = Math.max(...data.map(item => item.volume));
-    
+
     // Use ratio between max and average to determine how much space to allocate
     const ratio = maxVolume / averageVolume;
-    
+
     // Adaptive calculation based on volume characteristics
     // Higher ratio means more volatility in volume, which needs more space
     const volumeHeight = Math.min(0.25, 0.15 + (ratio > 3 ? 0.1 : 0));
-    
+
     return {
       top: 1 - volumeHeight,
       bottom: 0.05
@@ -180,7 +180,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     };
 
     chartRef.current = createChart(chartContainerRef.current, chartOptions);
-    
+
     // Configure price scale
     configurePriceScale(chartRef.current);
 
@@ -192,9 +192,9 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       try {
         // Try to fetch data from API
         data = await fetchChartData(
-          'NSE', 
-          'TRIVENI', 
-          convertIntervalToMinutes(currentInterval), 
+          'NSE',
+          '',
+          convertIntervalToMinutes(currentInterval),
           API_CONFIG.STOCK_DATA_PATH
         );
 
@@ -241,7 +241,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
       // Process data based on chart style
       let open, high, low, close;
-      
+
       if (chartStyle === 'line' || chartStyle === 'area' || chartStyle === 'baseline') {
         // For line-based charts, only the close value is available
         close = candleData.value;
@@ -289,7 +289,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           width: chartContainerRef.current.clientWidth,
           height: chartContainerRef.current.clientHeight,
         });
-        
+
         // Recalculate volume scale on resize
         if (chartData) {
           const volumeMargins = calculateVolumeScaleMargins(chartData);
@@ -531,55 +531,34 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
   }, [chartStyle, chartData]);
 
   // Toggle fullscreen mode
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      // Enter fullscreen
-      if (fullScreenContainerRef.current.requestFullscreen) {
-        fullScreenContainerRef.current.requestFullscreen();
-      } else if (fullScreenContainerRef.current.webkitRequestFullscreen) {
-        fullScreenContainerRef.current.webkitRequestFullscreen();
-      } else if (fullScreenContainerRef.current.msRequestFullscreen) {
-        fullScreenContainerRef.current.msRequestFullscreen();
-      }
-      setIsFullscreen(true);
-    } else {
-      // Exit fullscreen
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
-      }
-      setIsFullscreen(false);
-    }
-  };
-
   // Listen for fullscreen change events
+  // Update the fullscreenChangeHandler function in ChartContainer.jsx
   useEffect(() => {
     const fullscreenChangeHandler = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-      
-      // Resize chart after fullscreen change
-      if (chartRef.current && chartContainerRef.current) {
-        setTimeout(() => {
-          chartRef.current.applyOptions({
-            width: chartContainerRef.current.clientWidth,
-            height: chartContainerRef.current.clientHeight,
-          });
-          
-          // Recalculate volume scale
-          if (chartData) {
+      const isInFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isInFullscreen);
+
+      // Give the DOM time to update with the new dimensions
+      setTimeout(() => {
+        if (chartRef.current && chartContainerRef.current) {
+          // Explicitly resize the chart to fit the container
+          chartRef.current.resize(
+            chartContainerRef.current.clientWidth,
+            chartContainerRef.current.clientHeight
+          );
+
+          // Recalculate volume margins with updated dimensions
+          if (chartData && volumeSeriesRef.current) {
             const volumeMargins = calculateVolumeScaleMargins(chartData);
             chartRef.current.priceScale('volume').applyOptions({
               scaleMargins: volumeMargins,
             });
           }
-          
-          // Ensure chart content is fitted properly
+
+          // Ensure time scale is properly fitted
           chartRef.current.timeScale().fitContent();
-        }, 100);
-      }
+        }
+      }, 300); // Increased timeout to ensure DOM updates are complete
     };
 
     document.addEventListener('fullscreenchange', fullscreenChangeHandler);
@@ -595,6 +574,39 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     };
   }, [chartData]);
 
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      if (fullScreenContainerRef.current.requestFullscreen) {
+        fullScreenContainerRef.current.requestFullscreen();
+      } else if (fullScreenContainerRef.current.webkitRequestFullscreen) {
+        fullScreenContainerRef.current.webkitRequestFullscreen();
+      } else if (fullScreenContainerRef.current.msRequestFullscreen) {
+        fullScreenContainerRef.current.msRequestFullscreen();
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+      }
+
+      // Adding an immediate resize attempt before the fullscreenchange event fires
+      setTimeout(() => {
+        if (chartRef.current && chartContainerRef.current) {
+          chartRef.current.resize(
+            chartContainerRef.current.clientWidth,
+            chartContainerRef.current.clientHeight
+          );
+        }
+      }, 50);
+    }
+  };
+
   // Update chart size when sidebar toggle state changes
   useEffect(() => {
     if (chartRef.current && chartContainerRef.current) {
@@ -604,7 +616,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           width: chartContainerRef.current.clientWidth,
           height: chartContainerRef.current.clientHeight,
         });
-        
+
         // Recalculate volume scale
         if (chartData) {
           const volumeMargins = calculateVolumeScaleMargins(chartData);
@@ -612,7 +624,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
             scaleMargins: volumeMargins,
           });
         }
-        
+
         // Ensure time scale is properly adjusted
         chartRef.current.timeScale().fitContent();
       }, 300); // Match transition duration
