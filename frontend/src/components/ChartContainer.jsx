@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, PriceScaleMode, CrosshairMode } from 'lightweight-charts';
+import { fetchChartData } from '../utils/Requests';
 import { generateMockData } from '../utils/mockData';
+import { convertIntervalToMinutes } from '../utils/helper';
 import ChartToolbar from './ChartToolbar';
 import ChartHeader from './ChartHeader';
+import { API_CONFIG } from '../constants';
 
 function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selectedSymbol, setCurrentInterval }) {
   const chartContainerRef = useRef(null);
@@ -10,6 +13,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
   const chartRef = useRef(null);
   const seriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [chartStyle, setChartStyle] = useState('candles');
   const [chartData, setChartData] = useState(null);
   const [highlightedCandle, setHighlightedCandle] = useState({
@@ -23,7 +27,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
   // Function to update volume scale dynamically
   const updateVolumeScale = (data) => {
-    if (!chartRef.current || !volumeSeriesRef.current) return;
+    if (!chartRef.current || !volumeSeriesRef.current || !data) return;
 
     // Find the max volume to determine scale
     const maxVolume = Math.max(...data.map(d => d.volume));
@@ -41,7 +45,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
   // Initialize chart
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!chartContainerRef.current || !selectedSymbol) return;
 
     // Clear the seriesRef when recreating the chart
     seriesRef.current = null;
@@ -73,36 +77,73 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     };
 
     chartRef.current = createChart(chartContainerRef.current, chartOptions);
-    
-    // Generate and store data
-    const data = generateMockData(currentInterval);
-    setChartData(data);
 
-    // Add volume series (stays consistent across chart types)
-    const volumeSeries = chartRef.current.addHistogramSeries({
-      color: '#26a69a',
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'volume',
-    });
+    // Define an async function to load data
+    const loadChartData = async () => {
+      setIsLoading(true);
+      let data;
 
-    const volumeData = data.map(candle => ({
-      time: candle.time,
-      value: candle.volume,
-      color: candle.close >= candle.open ? '#26a69a' : '#ef5350',
-    }));
+      try {
+        // Try to fetch data from API
+        data = await fetchChartData('NSE', 'RPOWER', convertIntervalToMinutes(currentInterval), API_CONFIG.STOCK_DATA_PATH);
 
-    volumeSeries.setData(volumeData);
+        // If no data returned, fall back to mock data
+        if (!data || data.length === 0) {
+          console.log('No data returned from API, using mock data');
+          data = generateMockData(currentInterval);
+        }
+      } catch (error) {
+        console.error('Error loading chart data:', error);
+        // Fall back to mock data on error
+        data = generateMockData(currentInterval);
+      }
 
-    // Set price scale for volume
-    chartRef.current.priceScale('volume').applyOptions({
-      scaleMargins: {
-        top: 0.91,
-        bottom: 0,
-      },
-    });
+      setChartData(data);
+      setIsLoading(false);
+
+      // Add volume series (stays consistent across chart types)
+      const volumeSeries = chartRef.current.addHistogramSeries({
+        color: '#26a69a',
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume',
+      });
+      volumeSeriesRef.current = volumeSeries; // Set the ref here
+
+      const volumeData = data.map(candle => ({
+        time: candle.time,
+        value: candle.volume,
+        color: candle.close >= candle.open ? '#26a69a' : '#ef5350',
+      }));
+
+      volumeSeries.setData(volumeData);
+
+      // Set price scale for volume
+      chartRef.current.priceScale('volume').applyOptions({
+        scaleMargins: {
+          top: 0.91,
+          bottom: 0,
+        },
+      });
+
+      // Apply dynamic scaling
+      updateVolumeScale(data);
+
+      // Set price scale for volume
+      chartRef.current.priceScale('volume').applyOptions({
+        scaleMargins: {
+          top: 0.91,
+          bottom: 0,
+        },
+      });
+
+      updateVolumeScale(data);
+    };
+
 
     // Apply dynamic scaling
-    updateVolumeScale(data);
+
+    // Call the async function
+    loadChartData();
 
     // Update OHLC data on crosshair move and update ChartHeader
     chartRef.current.subscribeCrosshairMove(param => {
@@ -172,7 +213,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         });
         seriesRef.current.setData(chartData);
         break;
-        
+
       case 'hollow_candles':
         seriesRef.current = chartRef.current.addCandlestickSeries({
           upColor: '#26a69a',
@@ -188,26 +229,26 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         });
         seriesRef.current.setData(chartData);
         break;
-        
+
       case 'heikin_ashi':
         // Convert to Heikin Ashi data
         const haData = [];
         for (let i = 0; i < chartData.length; i++) {
           const current = chartData[i];
-          
+
           if (i === 0) {
             // First candle is the same
             haData.push(current);
             continue;
           }
-          
-          const previous = haData[i-1];
+
+          const previous = haData[i - 1];
           // Heikin Ashi calculations
           const haClose = (current.open + current.high + current.low + current.close) / 4;
           const haOpen = (previous.open + previous.close) / 2;
           const haHigh = Math.max(current.high, haOpen, haClose);
           const haLow = Math.min(current.low, haOpen, haClose);
-          
+
           haData.push({
             time: current.time,
             open: haOpen,
@@ -217,7 +258,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
             volume: current.volume
           });
         }
-        
+
         seriesRef.current = chartRef.current.addCandlestickSeries({
           upColor: '#26a69a',
           downColor: '#ef5350',
@@ -227,7 +268,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         });
         seriesRef.current.setData(haData);
         break;
-        
+
       case 'bar':
         seriesRef.current = chartRef.current.addBarSeries({
           upColor: '#26a69a',
@@ -236,7 +277,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         });
         seriesRef.current.setData(chartData);
         break;
-        
+
       case 'line':
         seriesRef.current = chartRef.current.addLineSeries({
           color: '#2196F3',
@@ -249,11 +290,11 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         }));
         seriesRef.current.setData(lineData);
         break;
-        
+
       case 'area':
         seriesRef.current = chartRef.current.addAreaSeries({
           topColor: 'rgba(33, 150, 243, 0.56)',
-          bottomColor: 'rgba(33, 150, 243, 0.04)', 
+          bottomColor: 'rgba(33, 150, 243, 0.04)',
           lineColor: 'rgba(33, 150, 243, 1)',
           lineWidth: 2,
         });
@@ -264,7 +305,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         }));
         seriesRef.current.setData(areaData);
         break;
-        
+
       case 'baseline':
         seriesRef.current = chartRef.current.addBaselineSeries({
           baseValue: { type: 'price', price: chartData[0].open },
@@ -355,24 +396,29 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" ref={fullScreenContainerRef}>
-      <ChartHeader 
+      <ChartHeader
         symbol={selectedSymbol}
-        price={`O: ${highlightedCandle.open} H: ${highlightedCandle.high} L: ${highlightedCandle.low} C: ${highlightedCandle.close}`} 
-        change={highlightedCandle.change} 
+        price={`O: ${highlightedCandle.open} H: ${highlightedCandle.high} L: ${highlightedCandle.low} C: ${highlightedCandle.close}`}
+        change={highlightedCandle.change}
         toggleSidebar={toggleSidebar}
         isSidebarOpen={isSidebarOpen}
         toggleFullscreen={toggleFullscreen}
         isFullscreen={isFullscreen}
       />
-      <ChartToolbar 
-        interval={currentInterval} 
+      <ChartToolbar
+        interval={currentInterval}
         setInterval={setCurrentInterval}
-        chartStyle={chartStyle} 
-        setChartStyle={setChartStyle} 
+        chartStyle={chartStyle}
+        setChartStyle={setChartStyle}
       />
       <div className="flex-1 relative transition-all duration-300 ease-in-out" ref={chartContainerRef}>
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
+            <div className="loader animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        )}
         {!isFullscreen && (
-          <button 
+          <button
             onClick={toggleFullscreen}
             className="absolute top-2 right-2 z-10 p-2 bg-gray-800 hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-opacity duration-300"
           >
