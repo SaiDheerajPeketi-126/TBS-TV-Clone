@@ -11,6 +11,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentInterval, setCurrentInterval] = useState('1D'); // Default timeframe
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSD'); // Default symbol
+  const [currentlyActiveExchange, setCurrentlyActiveExchange] = useState('NSE');
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -27,6 +28,7 @@ function App() {
           <Header
             setInterval={setCurrentInterval}
             onSymbolSelect={handleSymbolSelect}
+            setCurrentlyActiveExchange={setCurrentlyActiveExchange}
           />
           <div className="flex flex-1 overflow-hidden">
             {/* Sidebar with animation */}
@@ -37,7 +39,7 @@ function App() {
               <Sidebar onSymbolSelect={handleSymbolSelect} />
             </div>
             <Routes>
-              <Route path="/" element={<ChartContainer isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} currentInterval={currentInterval} selectedSymbol={selectedSymbol} setCurrentInterval={setCurrentInterval} />} />
+              <Route path="/" element={<ChartContainer isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} currentInterval={currentInterval} selectedSymbol={selectedSymbol} setCurrentInterval={setCurrentInterval} currentlyActiveExchange={currentlyActiveExchange}/>} />
               <Route path="/journal" element={<JournalPage />} />
             </Routes>
           </div>

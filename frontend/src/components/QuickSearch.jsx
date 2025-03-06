@@ -6,7 +6,8 @@ function QuickSearch({
   intervals,
   setInterval,
   currentInterval,
-  onSymbolSelect
+  onSymbolSelect,
+  setCurrentlyActiveExchange
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -188,6 +189,7 @@ function QuickSearch({
       setInterval(item);
     } else {
       onSymbolSelect(item.symbol);
+      setCurrentlyActiveExchange(item.exchange);
     }
     setIsOpen(false);
     setSearchText('');

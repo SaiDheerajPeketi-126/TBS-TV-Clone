@@ -7,7 +7,7 @@ import ChartToolbar from './ChartToolbar';
 import ChartHeader from './ChartHeader';
 import { API_CONFIG } from '../constants';
 
-function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selectedSymbol, setCurrentInterval }) {
+function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selectedSymbol, setCurrentInterval, currentlyActiveExchange }) {
   const chartContainerRef = useRef(null);
   const fullScreenContainerRef = useRef(null);
   const chartRef = useRef(null);
@@ -192,7 +192,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       try {
         // Try to fetch data from API
         data = await fetchChartData(
-          'NSE',
+          currentlyActiveExchange,
           selectedSymbol,
           convertIntervalToMinutes(currentInterval),
           API_CONFIG.STOCK_DATA_PATH

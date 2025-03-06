@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import QuickSearch from './QuickSearch';
 import Settings from './Settings';
 
-function Header({ setInterval, onSymbolSelect }) {
+function Header({ setInterval, onSymbolSelect, setCurrentlyActiveExchange  }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
@@ -29,6 +29,7 @@ function Header({ setInterval, onSymbolSelect }) {
               setInterval={setInterval}
               currentInterval={null}  // Will be properly passed from App.jsx
               onSymbolSelect={onSymbolSelect}
+              setCurrentlyActiveExchange={setCurrentlyActiveExchange}
             />
           </div>
 
