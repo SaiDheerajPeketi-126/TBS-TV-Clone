@@ -25,40 +25,125 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Function to update volume scale dynamically
-  const updateVolumeScale = (data) => {
-    if (!chartRef.current || !volumeSeriesRef.current || !data) return;
+  // Configure volume series with TradingView-like appearance
+  const configureVolumeSeries = (chart, data) => {
+    if (!chart || !data || data.length === 0) return null;
 
-    // Find the max volume to determine scale
-    const maxVolume = Math.max(...data.map(d => d.volume));
+    // Remove previous volume series if it exists
+    if (volumeSeriesRef.current) {
+      try {
+        chart.removeSeries(volumeSeriesRef.current);
+      } catch (error) {
+        console.warn('Failed to remove volume series:', error);
+      }
+    }
 
-    // Adjust scale dynamically based on max volume
-    const topMargin = Math.max(0.7 - maxVolume / 10000000, 0.4); // Adjust range as needed
-
-    chartRef.current.priceScale('volume').applyOptions({
+    // Create new volume series with TradingView-like appearance
+    const volumeSeries = chart.addHistogramSeries({
+      color: '#26a69a',
+      priceFormat: {
+        type: 'volume',
+        precision: 0,
+        minMove: 1,
+      },
+      priceScaleId: 'volume',
       scaleMargins: {
-        top: topMargin,
+        top: 0.8, // Initial position - will be dynamically adjusted
         bottom: 0,
       },
+      baseLineVisible: false,
+      lastValueVisible: false,
     });
+
+    // Format volume data with appropriate coloring
+    const volumeData = data.map(candle => ({
+      time: candle.time,
+      value: candle.volume,
+      color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
+    }));
+
+    volumeSeries.setData(volumeData);
+
+    // Configure volume price scale like TradingView
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: {
+        top: 0.8,
+        bottom: 0.05,
+      },
+      borderVisible: false,
+      entireTextOnly: true,
+      drawTicks: false,
+      visible: true,
+      alignLabels: true,
+    });
+
+    return volumeSeries;
+  };
+
+  // Configure price scale with TradingView-like appearance
+  const configurePriceScale = (chart) => {
+    if (!chart) return;
+
+    // Configure right price scale like TradingView
+    chart.priceScale('right').applyOptions({
+      borderColor: 'rgba(42, 46, 57, 0.5)',
+      borderVisible: true,
+      entireTextOnly: false,
+      mode: PriceScaleMode.Normal,
+      autoScale: true,
+      scaleMargins: {
+        top: 0.1,
+        bottom: 0.2, // Leave space for volume series
+      },
+      ticksVisible: false,
+      alignLabels: true,
+    });
+  };
+
+  // Calculate dynamic volume scale based on data
+  const calculateVolumeScaleMargins = (data) => {
+    if (!data || data.length === 0) return { top: 0.8, bottom: 0.05 };
+
+    // Calculate average volume to set a more appropriate scale
+    const averageVolume = data.reduce((sum, item) => sum + item.volume, 0) / data.length;
+    const maxVolume = Math.max(...data.map(item => item.volume));
+    
+    // Use ratio between max and average to determine how much space to allocate
+    const ratio = maxVolume / averageVolume;
+    
+    // Adaptive calculation based on volume characteristics
+    // Higher ratio means more volatility in volume, which needs more space
+    const volumeHeight = Math.min(0.25, 0.15 + (ratio > 3 ? 0.1 : 0));
+    
+    return {
+      top: 1 - volumeHeight,
+      bottom: 0.05
+    };
   };
 
   // Initialize chart
   useEffect(() => {
     if (!chartContainerRef.current || !selectedSymbol) return;
 
-    // Clear the seriesRef when recreating the chart
+    // Clear previous chart
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
+    }
+
     seriesRef.current = null;
     volumeSeriesRef.current = null;
 
+    // Create chart with TradingView-like appearance
     const chartOptions = {
       layout: {
-        background: { color: '#1a1a1a' },
+        background: { type: 'solid', color: '#131722' },
         textColor: '#d1d4dc',
+        fontSize: 12,
       },
       grid: {
-        vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
-        horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
+        vertLines: { color: 'rgba(42, 46, 57, 0.2)', style: 0 },
+        horzLines: { color: 'rgba(42, 46, 57, 0.2)', style: 0 },
       },
       width: chartContainerRef.current.clientWidth,
       height: chartContainerRef.current.clientHeight,
@@ -66,17 +151,38 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         timeVisible: true,
         secondsVisible: false,
         borderColor: 'rgba(42, 46, 57, 0.5)',
-      },
-      priceScale: {
-        mode: PriceScaleMode.Normal, // Keeps price movement free
-        autoScale: true,
+        rightOffset: 12,
+        barSpacing: 6,
+        fixLeftEdge: true,
+        lockVisibleTimeRangeOnResize: true,
+        rightBarStaysOnScroll: true,
       },
       crosshair: {
-        mode: CrosshairMode.Normal, // Disable snapping to price
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(224, 227, 235, 0.1)',
+          width: 1,
+          style: 0,
+          visible: true,
+          labelVisible: false,
+        },
+        horzLine: {
+          color: 'rgba(224, 227, 235, 0.1)',
+          width: 1,
+          style: 0,
+          visible: true,
+          labelVisible: true,
+        },
+      },
+      handleScale: {
+        axisPressedMouseMove: true,
       },
     };
 
     chartRef.current = createChart(chartContainerRef.current, chartOptions);
+    
+    // Configure price scale
+    configurePriceScale(chartRef.current);
 
     // Define an async function to load data
     const loadChartData = async () => {
@@ -85,7 +191,12 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
       try {
         // Try to fetch data from API
-        data = await fetchChartData('NSE', 'RPOWER', convertIntervalToMinutes(currentInterval), API_CONFIG.STOCK_DATA_PATH);
+        data = await fetchChartData(
+          'NSE', 
+          'TRIVENI', 
+          convertIntervalToMinutes(currentInterval), 
+          API_CONFIG.STOCK_DATA_PATH
+        );
 
         // If no data returned, fall back to mock data
         if (!data || data.length === 0) {
@@ -101,58 +212,65 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       setChartData(data);
       setIsLoading(false);
 
-      // Add volume series (stays consistent across chart types)
-      const volumeSeries = chartRef.current.addHistogramSeries({
-        color: '#26a69a',
-        priceFormat: { type: 'volume' },
-        priceScaleId: 'volume',
-      });
-      volumeSeriesRef.current = volumeSeries; // Set the ref here
+      // Configure volume series with TradingView-like appearance
+      volumeSeriesRef.current = configureVolumeSeries(chartRef.current, data);
 
-      const volumeData = data.map(candle => ({
-        time: candle.time,
-        value: candle.volume,
-        color: candle.close >= candle.open ? '#26a69a' : '#ef5350',
-      }));
-
-      volumeSeries.setData(volumeData);
-
-      // Set price scale for volume
+      // Apply specific volume scale margins based on data characteristics
+      const volumeMargins = calculateVolumeScaleMargins(data);
       chartRef.current.priceScale('volume').applyOptions({
-        scaleMargins: {
-          top: 0.91,
-          bottom: 0,
-        },
+        scaleMargins: volumeMargins,
       });
 
-      // Apply dynamic scaling
-      updateVolumeScale(data);
+      // Apply the appropriate chart style
+      applyChartStyle(chartStyle, data);
 
-      // Set price scale for volume
-      chartRef.current.priceScale('volume').applyOptions({
-        scaleMargins: {
-          top: 0.91,
-          bottom: 0,
-        },
-      });
-
-      updateVolumeScale(data);
+      // Set chart's visible range to show most recent data with some history
+      chartRef.current.timeScale().fitContent();
     };
-
-
-    // Apply dynamic scaling
 
     // Call the async function
     loadChartData();
 
-    // Update OHLC data on crosshair move and update ChartHeader
+    // Update OHLC data on crosshair move
     chartRef.current.subscribeCrosshairMove(param => {
-      if (!param || !param.seriesData) return;
+      if (!param || !param.seriesData || !seriesRef.current) return;
 
+      // Get data from the current series
       const candleData = param.seriesData.get(seriesRef.current);
       if (!candleData) return;
 
-      const { open, high, low, close } = candleData;
+      // Process data based on chart style
+      let open, high, low, close;
+      
+      if (chartStyle === 'line' || chartStyle === 'area' || chartStyle === 'baseline') {
+        // For line-based charts, only the close value is available
+        close = candleData.value;
+        // Find the corresponding candle in the original data for the remaining values
+        if (chartData && chartData.length > 0) {
+          const timeStr = param.time && param.time.toString();
+          const originalCandle = chartData.find(candle => candle.time.toString() === timeStr);
+          if (originalCandle) {
+            open = originalCandle.open;
+            high = originalCandle.high;
+            low = originalCandle.low;
+          } else {
+            open = close;
+            high = close;
+            low = close;
+          }
+        } else {
+          open = close;
+          high = close;
+          low = close;
+        }
+      } else {
+        // For candle-based charts, all values are available
+        open = candleData.open;
+        high = candleData.high;
+        low = candleData.low;
+        close = candleData.close;
+      }
+
       const percentageChange = ((close - open) / open) * 100;
       const formattedChange = `${percentageChange.toFixed(2)}`;
 
@@ -166,30 +284,36 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     });
 
     const handleResize = () => {
-      chartRef.current.applyOptions({
-        width: chartContainerRef.current.clientWidth,
-        height: chartContainerRef.current.clientHeight,
-      });
-
-      updateVolumeScale(chartData); // Update volume scale on resize
+      if (chartRef.current && chartContainerRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight,
+        });
+        
+        // Recalculate volume scale on resize
+        if (chartData) {
+          const volumeMargins = calculateVolumeScaleMargins(chartData);
+          chartRef.current.priceScale('volume').applyOptions({
+            scaleMargins: volumeMargins,
+          });
+        }
+      }
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
-      chartRef.current.remove();
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
       window.removeEventListener('resize', handleResize);
     };
   }, [currentInterval, selectedSymbol, isFullscreen]);
 
-  // Update volume scale when chart data changes
-  useEffect(() => {
-    if (chartData) updateVolumeScale(chartData);
-  }, [chartData]);
-
-  // Handle chart style changes
-  useEffect(() => {
-    if (!chartRef.current || !chartData) return;
+  // Helper function to apply chart style
+  const applyChartStyle = (style, data) => {
+    if (!chartRef.current || !data) return;
 
     // Remove previous series if it exists
     if (seriesRef.current) {
@@ -197,12 +321,11 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         chartRef.current.removeSeries(seriesRef.current);
       } catch (error) {
         console.warn('Failed to remove series:', error);
-        // Continue with creating a new series
       }
     }
 
-    // Apply different chart styles
-    switch (chartStyle) {
+    // Apply different chart styles with TradingView-like appearance
+    switch (style) {
       case 'candles':
         seriesRef.current = chartRef.current.addCandlestickSeries({
           upColor: '#26a69a',
@@ -210,31 +333,48 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           borderVisible: false,
           wickUpColor: '#26a69a',
           wickDownColor: '#ef5350',
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
+          lastValueVisible: true,
+          priceLineVisible: true,
+          priceLineWidth: 1,
+          priceLineColor: '#4682B4',
+          priceLineStyle: 2, // Dotted line for price
         });
-        seriesRef.current.setData(chartData);
+        seriesRef.current.setData(data);
         break;
 
       case 'hollow_candles':
         seriesRef.current = chartRef.current.addCandlestickSeries({
-          upColor: '#26a69a',
-          downColor: '#ef5350',
+          upColor: 'rgba(38, 166, 154, 0.1)',  // Transparent green
+          downColor: 'rgba(239, 83, 80, 0.1)',  // Transparent red
           borderVisible: true,
           borderUpColor: '#26a69a',
           borderDownColor: '#ef5350',
           wickUpColor: '#26a69a',
           wickDownColor: '#ef5350',
-          // For hollow candles, we use a different color for the body
-          upColor: 'rgba(38, 166, 154, 0.1)',  // Very transparent green
-          downColor: 'rgba(239, 83, 80, 0.1)',  // Very transparent red
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
+          lastValueVisible: true,
+          priceLineVisible: true,
+          priceLineWidth: 1,
+          priceLineColor: '#4682B4',
+          priceLineStyle: 2,
         });
-        seriesRef.current.setData(chartData);
+        seriesRef.current.setData(data);
         break;
 
       case 'heikin_ashi':
         // Convert to Heikin Ashi data
         const haData = [];
-        for (let i = 0; i < chartData.length; i++) {
-          const current = chartData[i];
+        for (let i = 0; i < data.length; i++) {
+          const current = data[i];
 
           if (i === 0) {
             // First candle is the same
@@ -265,6 +405,16 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           borderVisible: false,
           wickUpColor: '#26a69a',
           wickDownColor: '#ef5350',
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
+          lastValueVisible: true,
+          priceLineVisible: true,
+          priceLineWidth: 1,
+          priceLineColor: '#4682B4',
+          priceLineStyle: 2,
         });
         seriesRef.current.setData(haData);
         break;
@@ -274,17 +424,39 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           upColor: '#26a69a',
           downColor: '#ef5350',
           thinBars: true,
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
+          lastValueVisible: true,
+          priceLineVisible: true,
+          priceLineWidth: 1,
+          priceLineColor: '#4682B4',
+          priceLineStyle: 2,
         });
-        seriesRef.current.setData(chartData);
+        seriesRef.current.setData(data);
         break;
 
       case 'line':
         seriesRef.current = chartRef.current.addLineSeries({
           color: '#2196F3',
           lineWidth: 2,
+          crosshairMarkerVisible: true,
+          crosshairMarkerRadius: 4,
+          lastValueVisible: true,
+          priceLineVisible: true,
+          priceLineWidth: 1,
+          priceLineColor: '#4682B4',
+          priceLineStyle: 2,
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
         });
         // Line chart needs different data format
-        const lineData = chartData.map(d => ({
+        const lineData = data.map(d => ({
           time: d.time,
           value: d.close
         }));
@@ -297,9 +469,21 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           bottomColor: 'rgba(33, 150, 243, 0.04)',
           lineColor: 'rgba(33, 150, 243, 1)',
           lineWidth: 2,
+          crosshairMarkerVisible: true,
+          crosshairMarkerRadius: 4,
+          lastValueVisible: true,
+          priceLineVisible: true,
+          priceLineWidth: 1,
+          priceLineColor: '#4682B4',
+          priceLineStyle: 2,
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
         });
         // Area chart needs different data format
-        const areaData = chartData.map(d => ({
+        const areaData = data.map(d => ({
           time: d.time,
           value: d.close
         }));
@@ -308,7 +492,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
       case 'baseline':
         seriesRef.current = chartRef.current.addBaselineSeries({
-          baseValue: { type: 'price', price: chartData[0].open },
+          baseValue: { type: 'price', price: data[0].open },
           topLineColor: 'rgba(38, 166, 154, 1)',
           topFillColor1: 'rgba(38, 166, 154, 0.28)',
           topFillColor2: 'rgba(38, 166, 154, 0.05)',
@@ -316,24 +500,34 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           bottomFillColor1: 'rgba(239, 83, 80, 0.28)',
           bottomFillColor2: 'rgba(239, 83, 80, 0.05)',
           lineWidth: 2,
+          crosshairMarkerVisible: true,
+          crosshairMarkerRadius: 4,
+          lastValueVisible: true,
+          priceLineVisible: true,
+          priceLineWidth: 1,
+          priceLineColor: '#4682B4',
+          priceLineStyle: 2,
+          priceFormat: {
+            type: 'price',
+            precision: 2,
+            minMove: 0.01,
+          },
         });
         // Baseline chart needs different data format
-        const baselineData = chartData.map(d => ({
+        const baselineData = data.map(d => ({
           time: d.time,
           value: d.close
         }));
         seriesRef.current.setData(baselineData);
         break;
     }
+  };
 
-    // Adjust price scale margins
-    chartRef.current.priceScale('right').applyOptions({
-      scaleMargins: {
-        top: 0.05,
-        bottom: 0.15,
-      },
-    });
-
+  // Apply chart style when it changes
+  useEffect(() => {
+    if (chartData) {
+      applyChartStyle(chartStyle, chartData);
+    }
   }, [chartStyle, chartData]);
 
   // Toggle fullscreen mode
@@ -361,10 +555,31 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     }
   };
 
-  // Listen for fullscreen change events (e.g., when user presses Esc to exit)
+  // Listen for fullscreen change events
   useEffect(() => {
     const fullscreenChangeHandler = () => {
       setIsFullscreen(!!document.fullscreenElement);
+      
+      // Resize chart after fullscreen change
+      if (chartRef.current && chartContainerRef.current) {
+        setTimeout(() => {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight,
+          });
+          
+          // Recalculate volume scale
+          if (chartData) {
+            const volumeMargins = calculateVolumeScaleMargins(chartData);
+            chartRef.current.priceScale('volume').applyOptions({
+              scaleMargins: volumeMargins,
+            });
+          }
+          
+          // Ensure chart content is fitted properly
+          chartRef.current.timeScale().fitContent();
+        }, 100);
+      }
     };
 
     document.addEventListener('fullscreenchange', fullscreenChangeHandler);
@@ -378,7 +593,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       document.removeEventListener('mozfullscreenchange', fullscreenChangeHandler);
       document.removeEventListener('MSFullscreenChange', fullscreenChangeHandler);
     };
-  }, []);
+  }, [chartData]);
 
   // Update chart size when sidebar toggle state changes
   useEffect(() => {
@@ -389,10 +604,20 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           width: chartContainerRef.current.clientWidth,
           height: chartContainerRef.current.clientHeight,
         });
-        updateVolumeScale(chartData);
+        
+        // Recalculate volume scale
+        if (chartData) {
+          const volumeMargins = calculateVolumeScaleMargins(chartData);
+          chartRef.current.priceScale('volume').applyOptions({
+            scaleMargins: volumeMargins,
+          });
+        }
+        
+        // Ensure time scale is properly adjusted
+        chartRef.current.timeScale().fitContent();
       }, 300); // Match transition duration
     }
-  }, [isSidebarOpen]);
+  }, [isSidebarOpen, chartData]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" ref={fullScreenContainerRef}>
@@ -421,6 +646,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
           <button
             onClick={toggleFullscreen}
             className="absolute top-2 right-2 z-10 p-2 bg-gray-800 hover:bg-gray-700 rounded opacity-50 hover:opacity-100 transition-opacity duration-300"
+            title="Toggle Fullscreen"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
               <path fillRule="evenodd" d="M5.25 2A3.25 3.25 0 002 5.25v9.5A3.25 3.25 0 005.25 18h9.5A3.25 3.25 0 0018 14.75v-9.5A3.25 3.25 0 0014.75 2h-9.5zm.22 13.72h2.03a.75.75 0 000-1.5H5.5a.75.75 0 00-.75.75v2c0 .414.336.75.75.75a.75.75 0 00.75-.75v-1.25zm9.03-8.72H12.5a.75.75 0 010-1.5h2a.75.75 0 01.75.75v2a.75.75 0 01-1.5 0V7z" clipRule="evenodd" />
