@@ -160,16 +160,16 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: 'rgba(224, 227, 235, 0.1)',
+          color: 'rgba(224, 227, 235, 0.65)',
           width: 1,
-          style: 0,
+          style: 3,
           visible: true,
-          labelVisible: false,
+          labelVisible: true,
         },
         horzLine: {
-          color: 'rgba(224, 227, 235, 0.1)',
+          color: 'rgba(224, 227, 235, 0.65)',
           width: 1,
-          style: 0,
+          style: 3,
           visible: true,
           labelVisible: true,
         },
