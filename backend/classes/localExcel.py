@@ -12,6 +12,24 @@ class LocalExcel:
         
         '''
 
+    def get_all_possible():
+        try:
+            stock_list = []
+            for root, dirs, files in os.walk("./data"):
+                # Filter only Excel files
+                excel_files = [f for f in files if f.endswith((".xlsx", ".xls"))]
+                
+                for i in excel_files:
+                    df = pd.read_excel(os.path.join(root,i),index_col=False)
+                    for row in df.iterrows():
+                        stock_list.append({'name':row["name"],'symbol':row["symbol"],'exchange':row["exch_seg"]})
+
+            if len(df) == 0: return None
+            return stock_list
+        except Exception as e:
+            return {"error": str(e)}
+        
+
 
     def get_all_local(path):
         """

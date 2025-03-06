@@ -32,12 +32,14 @@ class BacktestRequest(BaseModel):
     strategy: str
     parameters: Dict[str, Any]
 
-@app.get("/api/search")
+@app.get("/api/search/")
 async def get_all_sheets(path: str = "../sheets"):
     
     return LocalExcel.get_all_local(path=path)
 
-
+@app.get("/api/get_stock_list")
+async def get_stock_list():
+    return LocalExcel.get_all_possible()
 
 @app.get("/api/data")
 async def get_market_data(stock_exchange:str,stock_symbol:str ,path :str = "../sheets",stock_time_frame:int = 1):
