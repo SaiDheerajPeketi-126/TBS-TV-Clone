@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_CONFIG } from '../constants';
 
 // This component handles both timeframe quick switching and symbol search
 function QuickSearch({ 
@@ -12,26 +13,13 @@ function QuickSearch({
   const [searchResults, setSearchResults] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchType, setSearchType] = useState(null); // 'timeframe' or 'symbol'
+  const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
   const selectedItemRef = useRef(null);
 
   // For timeframe grid navigation
   const COLUMNS_PER_ROW = 4;
-  
-  // Mock symbols for demo purposes
-  const mockSymbols = [
-    { symbol: 'BTCUSD', name: 'Bitcoin / US Dollar' },
-    { symbol: 'ETHUSD', name: 'Ethereum / US Dollar' },
-    { symbol: 'AAPL', name: 'Apple Inc.' },
-    { symbol: 'MSFT', name: 'Microsoft Corporation' },
-    { symbol: 'GOOGL', name: 'Alphabet Inc.' },
-    { symbol: 'AMZN', name: 'Amazon.com, Inc.' },
-    { symbol: 'META', name: 'Meta Platforms, Inc.' },
-    { symbol: 'TSLA', name: 'Tesla, Inc.' },
-    { symbol: 'NVDA', name: 'NVIDIA Corporation' },
-    { symbol: 'BNB', name: 'Binance Coin' }
-  ];
   
   // Handle keyboard shortcuts to open quick search (Alt+G common in trading platforms)
   useEffect(() => {
@@ -67,9 +55,30 @@ function QuickSearch({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
+
+  // Fetch symbol data from API
+  const fetchSymbols = async (query) => {
+    setIsLoading(true);
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_CONFIG.SEARCH_ENDPOINT}?path=${API_CONFIG.STOCK_DATA_PATH}&query=${encodeURIComponent(query)}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch symbols');
+      }      
+      const data = await response.json();
+      console.log(data)
+      return data['NSE'];
+    } catch (error) {
+      console.error('Error fetching symbols:', error);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   // Handle input changes
-  const handleInputChange = (e) => {
+  const handleInputChange = async (e) => {
     const value = e.target.value;
     setSearchText(value);
     
@@ -84,12 +93,17 @@ function QuickSearch({
       );
       setSearchResults(filteredIntervals);
     } else {
-      // Filter symbols
-      const filteredSymbols = mockSymbols.filter(item => 
-        item.symbol.toLowerCase().includes(value.toLowerCase()) || 
-        item.name.toLowerCase().includes(value.toLowerCase())
-      );
-      setSearchResults(filteredSymbols);
+      // Search symbols using API
+      if (value.trim().length > 0) {
+        const symbols = await fetchSymbols(value);
+        const filteredSymbols = symbols.filter(item => 
+          item.symbol.toLowerCase().includes(value.toLowerCase()) || 
+          item.name.toLowerCase().includes(value.toLowerCase())
+        );
+        setSearchResults(filteredSymbols);
+      } else {
+        setSearchResults([]);
+      }
     }
     
     setSelectedIndex(0);
@@ -235,7 +249,13 @@ function QuickSearch({
               />
             </div>
             
-            {searchResults.length > 0 && (
+            {isLoading && (
+              <div className="p-4 text-gray-400 flex justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            )}
+            
+            {!isLoading && searchResults.length > 0 && (
               <div ref={resultsRef} className="max-h-64 overflow-y-auto">
                 {searchType === 'timeframe' ? (
                   <div className="p-2">
@@ -278,7 +298,7 @@ function QuickSearch({
               </div>
             )}
             
-            {searchText && searchResults.length === 0 && (
+            {!isLoading && searchText && searchResults.length === 0 && (
               <div className="p-4 text-gray-400">
                 No results found for "{searchText}"
               </div>
