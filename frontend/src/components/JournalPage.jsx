@@ -67,14 +67,106 @@ const sampleTrades = [
   }
 ];
 
+// Initial empty trade template
+const emptyTradeTemplate = {
+  id: null,
+  image: "https://source.unsplash.com/400x300/?trading-default",
+  buyDate: "",
+  result: "",
+  sellDate: "",
+  buyPrice: "",
+  sellPrice: "",
+  stopLoss: "",
+  strategy: "",
+  comments: "",
+  market: "",
+  segment: "",
+  scrip: "",
+  timeOfBuy: "",
+  timeOfSell: "",
+  capitalUsed: "",
+  percentageChange: "",
+  capitalAfterTrade: "",
+  riskRewardRatio: "",
+};
+
 function JournalPage() {
   const [trades, setTrades] = useState(sampleTrades);
   const [selectedTrade, setSelectedTrade] = useState(null);
   const [filterValue, setFilterValue] = useState("");
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState(emptyTradeTemplate);
 
+  // Delete a trade
   const deleteTrade = (id) => {
     setTrades(trades.filter((trade) => trade.id !== id));
     setSelectedTrade(null);
+  };
+
+  // Open form for creating a new trade
+  const openNewTradeForm = () => {
+    setFormData(emptyTradeTemplate);
+    setIsEditing(false);
+    setIsFormOpen(true);
+    setSelectedTrade(null);
+  };
+
+  // Open form for editing an existing trade
+  const openEditForm = (trade) => {
+    setFormData({...trade});
+    setIsEditing(true);
+    setIsFormOpen(true);
+    setSelectedTrade(null);
+  };
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
+  // Calculate percentage change and capital after trade
+  const calculateResults = () => {
+    if (formData.buyPrice && formData.sellPrice && formData.capitalUsed) {
+      const buyPrice = parseFloat(formData.buyPrice);
+      const sellPrice = parseFloat(formData.sellPrice);
+      const capitalUsed = parseFloat(formData.capitalUsed);
+      
+      const percentageChange = ((sellPrice - buyPrice) / buyPrice * 100).toFixed(2);
+      const changeAmount = capitalUsed * (percentageChange / 100);
+      const capitalAfterTrade = capitalUsed + changeAmount;
+      
+      setFormData({
+        ...formData,
+        percentageChange: percentageChange > 0 ? `+${percentageChange}%` : `${percentageChange}%`,
+        result: percentageChange > 0 ? "Profit" : "Loss",
+        capitalAfterTrade: capitalAfterTrade.toFixed(0)
+      });
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (isEditing) {
+      // Update existing trade
+      setTrades(trades.map(trade => 
+        trade.id === formData.id ? formData : trade
+      ));
+    } else {
+      // Create new trade with a unique ID
+      const newId = Math.max(...trades.map(trade => trade.id), 0) + 1;
+      setTrades([...trades, { ...formData, id: newId }]);
+    }
+    
+    // Close the form
+    setIsFormOpen(false);
+    setFormData(emptyTradeTemplate);
   };
 
   // Filter trades based on search input
@@ -118,7 +210,10 @@ function JournalPage() {
                 </button>
               )}
             </div>
-            <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+            <button 
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+              onClick={openNewTradeForm}
+            >
               + New Trade
             </button>
           </div>
@@ -162,7 +257,7 @@ function JournalPage() {
 
       {/* Trade Details Modal */}
       {selectedTrade && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
+        <div className="fixed inset-0 flex items-center justify-center  bg-opacity-30 backdrop-blur-md z-50">
           <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
@@ -226,7 +321,14 @@ function JournalPage() {
               </div>
 
               <div className="flex justify-end space-x-3">
-                <button className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">Edit</button>
+                <button 
+                  className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+                  onClick={() => {
+                    openEditForm(selectedTrade);
+                  }}
+                >
+                  Edit
+                </button>
                 <button 
                   onClick={() => deleteTrade(selectedTrade.id)} 
                   className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
@@ -234,6 +336,257 @@ function JournalPage() {
                   Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Trade Form Modal */}
+      {isFormOpen && (
+        <div className="fixed inset-0 flex items-center justify-center  bg-opacity-30 backdrop-blur-md z-50">
+          <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden m-4">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6">
+                <h3 className="text-xl font-bold text-blue-400">
+                  {isEditing ? "Edit Trade" : "Add New Trade"}
+                </h3>
+                <button 
+                  onClick={() => setIsFormOpen(false)} 
+                  className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full h-8 w-8 flex items-center justify-center"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Basic Information */}
+                  <div className="space-y-4 col-span-1 md:col-span-2">
+                    <h4 className="text-lg font-medium text-blue-300">Basic Information</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Scrip/Symbol</label>
+                        <input
+                          type="text"
+                          name="scrip"
+                          value={formData.scrip}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Market</label>
+                        <select
+                          name="market"
+                          value={formData.market}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        >
+                          <option value="">Select Market</option>
+                          <option value="NSE">NSE</option>
+                          <option value="BSE">BSE</option>
+                          <option value="Crypto">Crypto</option>
+                          <option value="Forex">Forex</option>
+                          <option value="Commodities">Commodities</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Segment</label>
+                        <select
+                          name="segment"
+                          value={formData.segment}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        >
+                          <option value="">Select Segment</option>
+                          <option value="Equity">Equity</option>
+                          <option value="F&O">F&O</option>
+                          <option value="Spot">Spot</option>
+                          <option value="Futures">Futures</option>
+                          <option value="Options">Options</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Image URL</label>
+                        <input
+                          type="text"
+                          name="image"
+                          value={formData.image}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Entry Details */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-medium text-blue-300">Entry Details</h4>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Entry Date</label>
+                      <input
+                        type="date"
+                        name="buyDate"
+                        value={formData.buyDate}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Entry Time</label>
+                      <input
+                        type="text"
+                        name="timeOfBuy"
+                        value={formData.timeOfBuy}
+                        onChange={handleInputChange}
+                        placeholder="e.g. 10:30 AM"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Entry Price</label>
+                      <input
+                        type="number"
+                        name="buyPrice"
+                        value={formData.buyPrice}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Stop Loss</label>
+                      <input
+                        type="number"
+                        name="stopLoss"
+                        value={formData.stopLoss}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Exit Details */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-medium text-blue-300">Exit Details</h4>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Exit Date</label>
+                      <input
+                        type="date"
+                        name="sellDate"
+                        value={formData.sellDate}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Exit Time</label>
+                      <input
+                        type="text"
+                        name="timeOfSell"
+                        value={formData.timeOfSell}
+                        onChange={handleInputChange}
+                        placeholder="e.g. 02:45 PM"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Exit Price</label>
+                      <input
+                        type="number"
+                        name="sellPrice"
+                        value={formData.sellPrice}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Capital Used</label>
+                      <input
+                        type="number"
+                        name="capitalUsed"
+                        value={formData.capitalUsed}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Trade Analysis */}
+                  <div className="space-y-4 col-span-1 md:col-span-2">
+                    <h4 className="text-lg font-medium text-blue-300">Trade Analysis</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Risk/Reward Ratio</label>
+                        <input
+                          type="text"
+                          name="riskRewardRatio"
+                          value={formData.riskRewardRatio}
+                          onChange={handleInputChange}
+                          placeholder="e.g. 1:2"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Strategy</label>
+                        <input
+                          type="text"
+                          name="strategy"
+                          value={formData.strategy}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={calculateResults}
+                          className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                        >
+                          Calculate Results
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Comments/Notes</label>
+                      <textarea
+                        name="comments"
+                        value={formData.comments}
+                        onChange={handleInputChange}
+                        rows="3"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      ></textarea>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsFormOpen(false)}
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg"
+                  >
+                    {isEditing ? "Update Trade" : "Add Trade"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
