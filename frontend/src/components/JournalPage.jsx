@@ -97,7 +97,9 @@ function JournalPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(emptyTradeTemplate);
-  
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
+
   // Refs for modal content
   const tradeDetailsRef = useRef(null);
   const formRef = useRef(null);
@@ -109,18 +111,64 @@ function JournalPage() {
       if (selectedTrade && tradeDetailsRef.current && !tradeDetailsRef.current.contains(event.target)) {
         setSelectedTrade(null);
       }
-      
+
       // For form modal
       if (isFormOpen && formRef.current && !formRef.current.contains(event.target)) {
         setIsFormOpen(false);
       }
     }
-    
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [selectedTrade, isFormOpen]);
+
+  // Handle file upload
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.match('image.*')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+        setFormData({
+          ...formData,
+          image: e.target.result
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle paste from clipboard
+  const handlePaste = (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let item of items) {
+      if (item.type.indexOf('image') === 0) {
+        const blob = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreview(e.target.result);
+          setFormData({
+            ...formData,
+            image: e.target.result
+          });
+        };
+        reader.readAsDataURL(blob);
+        break;
+      }
+    }
+  };
+
+  // Add useEffect to set up the paste event listener
+  useEffect(() => {
+    if (isFormOpen) {
+      document.addEventListener('paste', handlePaste);
+    }
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [isFormOpen]);
 
   // Delete a trade
   const deleteTrade = (id) => {
@@ -138,7 +186,7 @@ function JournalPage() {
 
   // Open form for editing an existing trade
   const openEditForm = (trade) => {
-    setFormData({...trade});
+    setFormData({ ...trade });
     setIsEditing(true);
     setIsFormOpen(true);
     setSelectedTrade(null);
@@ -159,11 +207,11 @@ function JournalPage() {
       const buyPrice = parseFloat(formData.buyPrice);
       const sellPrice = parseFloat(formData.sellPrice);
       const capitalUsed = parseFloat(formData.capitalUsed);
-      
+
       const percentageChange = ((sellPrice - buyPrice) / buyPrice * 100).toFixed(2);
       const changeAmount = capitalUsed * (percentageChange / 100);
       const capitalAfterTrade = capitalUsed + changeAmount;
-      
+
       setFormData({
         ...formData,
         percentageChange: percentageChange > 0 ? `+${percentageChange}%` : `${percentageChange}%`,
@@ -176,10 +224,10 @@ function JournalPage() {
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (isEditing) {
       // Update existing trade
-      setTrades(trades.map(trade => 
+      setTrades(trades.map(trade =>
         trade.id === formData.id ? formData : trade
       ));
     } else {
@@ -187,14 +235,14 @@ function JournalPage() {
       const newId = Math.max(...trades.map(trade => trade.id), 0) + 1;
       setTrades([...trades, { ...formData, id: newId }]);
     }
-    
+
     // Close the form
     setIsFormOpen(false);
     setFormData(emptyTradeTemplate);
   };
 
   // Filter trades based on search input
-  const filteredTrades = trades.filter(trade => 
+  const filteredTrades = trades.filter(trade =>
     trade.scrip.toLowerCase().includes(filterValue.toLowerCase()) ||
     trade.strategy.toLowerCase().includes(filterValue.toLowerCase()) ||
     trade.result.toLowerCase().includes(filterValue.toLowerCase()) ||
@@ -226,7 +274,7 @@ function JournalPage() {
                 onChange={(e) => setFilterValue(e.target.value)}
               />
               {filterValue && (
-                <button 
+                <button
                   className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-200"
                   onClick={() => setFilterValue("")}
                 >
@@ -234,7 +282,7 @@ function JournalPage() {
                 </button>
               )}
             </div>
-            <button 
+            <button
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
               onClick={openNewTradeForm}
             >
@@ -250,8 +298,8 @@ function JournalPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredTrades.map((trade) => (
-              <div 
-                key={trade.id} 
+              <div
+                key={trade.id}
                 className="bg-gray-800 border border-gray-700 rounded-xl shadow-lg overflow-hidden hover:border-blue-500 transition-all cursor-pointer"
                 onClick={() => setSelectedTrade(trade)}
               >
@@ -282,7 +330,7 @@ function JournalPage() {
       {/* Trade Details Modal */}
       {selectedTrade && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-md z-50">
-          <div 
+          <div
             ref={tradeDetailsRef}
             className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full m-4 flex flex-col"
             style={{
@@ -295,11 +343,11 @@ function JournalPage() {
                   <h3 className="text-xl font-bold text-blue-400">Trade Details</h3>
                   <p className="text-gray-400">{selectedTrade.scrip} | {selectedTrade.market}</p>
                 </div>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedTrade(null);
-                  }} 
+                  }}
                   className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full h-8 w-8 flex items-center justify-center"
                 >
                   ×
@@ -309,7 +357,7 @@ function JournalPage() {
 
             <div className="overflow-y-auto px-6 py-4 flex-1 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
               <img src={selectedTrade.image} alt="Trade" className="w-full h-60 object-cover rounded-lg mb-6" />
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <h4 className="text-sm text-gray-400 mb-1">Entry Date</h4>
@@ -358,7 +406,7 @@ function JournalPage() {
 
             <div className="p-6 border-t border-gray-700 mt-auto">
               <div className="flex justify-end space-x-3">
-                <button 
+                <button
                   className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -367,11 +415,11 @@ function JournalPage() {
                 >
                   Edit
                 </button>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteTrade(selectedTrade.id);
-                  }} 
+                  }}
                   className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
                 >
                   Delete
@@ -385,7 +433,7 @@ function JournalPage() {
       {/* Add/Edit Trade Form Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-md z-50">
-          <div 
+          <div
             ref={formRef}
             className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-3xl w-full m-4 flex flex-col"
             style={{
@@ -397,11 +445,11 @@ function JournalPage() {
                 <h3 className="text-xl font-bold text-blue-400">
                   {isEditing ? "Edit Trade" : "Add New Trade"}
                 </h3>
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsFormOpen(false);
-                  }} 
+                  }}
                   className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full h-8 w-8 flex items-center justify-center"
                 >
                   ×
@@ -461,15 +509,64 @@ function JournalPage() {
                           <option value="Options">Options</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-sm text-gray-400 mb-1">Image URL</label>
-                        <input
-                          type="text"
-                          name="image"
-                          value={formData.image}
-                          onChange={handleInputChange}
-                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                      <div className="col-span-1 md:col-span-2">
+                        <label className="block text-sm text-gray-400 mb-1">Trade Image</label>
+                        <div className="flex flex-col space-y-3">
+                          {imagePreview && (
+                            <div className="relative">
+                              <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setImagePreview(null);
+                                  setFormData({ ...formData, image: "" });
+                                }}
+                                className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full h-6 w-6 flex items-center justify-center"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <input
+                                type="text"
+                                name="image"
+                                value={formData.image}
+                                onChange={handleInputChange}
+                                placeholder="Enter image URL"
+                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div className="flex space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current.click()}
+                                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm"
+                              >
+                                Upload Image
+                              </button>
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageUpload}
+                              />
+                              <button
+                                type="button"
+                                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm"
+                                onClick={() => alert("Paste image from clipboard anywhere in the form (Ctrl+V or Cmd+V)")}
+                              >
+                                Paste (Ctrl+V)
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            You can upload an image, paste from clipboard, or enter an image URL
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
