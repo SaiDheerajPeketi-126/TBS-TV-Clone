@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 const sampleTrades = [
   {
@@ -97,6 +97,30 @@ function JournalPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(emptyTradeTemplate);
+  
+  // Refs for modal content
+  const tradeDetailsRef = useRef(null);
+  const formRef = useRef(null);
+
+  // Handle clicks outside of modals
+  useEffect(() => {
+    function handleClickOutside(event) {
+      // For trade details modal
+      if (selectedTrade && tradeDetailsRef.current && !tradeDetailsRef.current.contains(event.target)) {
+        setSelectedTrade(null);
+      }
+      
+      // For form modal
+      if (isFormOpen && formRef.current && !formRef.current.contains(event.target)) {
+        setIsFormOpen(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [selectedTrade, isFormOpen]);
 
   // Delete a trade
   const deleteTrade = (id) => {
@@ -257,84 +281,107 @@ function JournalPage() {
 
       {/* Trade Details Modal */}
       {selectedTrade && (
-        <div className="fixed inset-0 flex items-center justify-center  bg-opacity-30 backdrop-blur-md z-50">
-          <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-blue-400">Trade Details</h3>
-                  <p className="text-gray-400">{selectedTrade.scrip} | {selectedTrade.market}</p>
-                </div>
-                <button 
-                  onClick={() => setSelectedTrade(null)} 
-                  className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full h-8 w-8 flex items-center justify-center"
-                >
-                  ×
-                </button>
-              </div>
-
-              <img src={selectedTrade.image} alt="Trade" className="w-full h-60 object-cover rounded-lg mb-6" />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Entry Date</h4>
-                  <p className="font-medium">{selectedTrade.buyDate} | {selectedTrade.timeOfBuy}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Exit Date</h4>
-                  <p className="font-medium">{selectedTrade.sellDate} | {selectedTrade.timeOfSell}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Entry Price</h4>
-                  <p className="font-medium">₹{selectedTrade.buyPrice.toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Exit Price</h4>
-                  <p className="font-medium">₹{selectedTrade.sellPrice.toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Stop Loss</h4>
-                  <p className="font-medium">₹{selectedTrade.stopLoss.toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Result</h4>
-                  <p className={`font-bold ${selectedTrade.result === "Profit" ? "text-green-400" : "text-red-400"}`}>
-                    {selectedTrade.percentageChange} ({selectedTrade.result})
-                  </p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Capital Used</h4>
-                  <p className="font-medium">₹{selectedTrade.capitalUsed.toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg">
-                  <h4 className="text-sm text-gray-400 mb-1">Capital After Trade</h4>
-                  <p className="font-medium">₹{selectedTrade.capitalAfterTrade.toLocaleString()}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg col-span-1 md:col-span-2">
-                  <h4 className="text-sm text-gray-400 mb-1">Strategy</h4>
-                  <p className="font-medium">{selectedTrade.strategy}</p>
-                </div>
-                <div className="bg-gray-700 p-4 rounded-lg col-span-1 md:col-span-2">
-                  <h4 className="text-sm text-gray-400 mb-1">Comments</h4>
-                  <p className="font-medium">{selectedTrade.comments}</p>
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-md z-50">
+          <div 
+            ref={tradeDetailsRef}
+            className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full m-4"
+            style={{
+              maxHeight: '90vh',
+              overflow: 'hidden'
+            }}
+          >
+            <div className="flex flex-col h-full">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-blue-400">Trade Details</h3>
+                    <p className="text-gray-400">{selectedTrade.scrip} | {selectedTrade.market}</p>
+                  </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTrade(null);
+                    }} 
+                    className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full h-8 w-8 flex items-center justify-center"
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3">
-                <button 
-                  className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
-                  onClick={() => {
-                    openEditForm(selectedTrade);
-                  }}
-                >
-                  Edit
-                </button>
-                <button 
-                  onClick={() => deleteTrade(selectedTrade.id)} 
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
-                >
-                  Delete
-                </button>
+              <div className="overflow-y-auto px-6" style={{ 
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#4B5563 #1F2937'
+              }}>
+                <img src={selectedTrade.image} alt="Trade" className="w-full h-60 object-cover rounded-lg mb-6" />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Entry Date</h4>
+                    <p className="font-medium">{selectedTrade.buyDate} | {selectedTrade.timeOfBuy}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Exit Date</h4>
+                    <p className="font-medium">{selectedTrade.sellDate} | {selectedTrade.timeOfSell}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Entry Price</h4>
+                    <p className="font-medium">₹{selectedTrade.buyPrice.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Exit Price</h4>
+                    <p className="font-medium">₹{selectedTrade.sellPrice.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Stop Loss</h4>
+                    <p className="font-medium">₹{selectedTrade.stopLoss.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Result</h4>
+                    <p className={`font-bold ${selectedTrade.result === "Profit" ? "text-green-400" : "text-red-400"}`}>
+                      {selectedTrade.percentageChange} ({selectedTrade.result})
+                    </p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Capital Used</h4>
+                    <p className="font-medium">₹{selectedTrade.capitalUsed.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg">
+                    <h4 className="text-sm text-gray-400 mb-1">Capital After Trade</h4>
+                    <p className="font-medium">₹{selectedTrade.capitalAfterTrade.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg col-span-1 md:col-span-2">
+                    <h4 className="text-sm text-gray-400 mb-1">Strategy</h4>
+                    <p className="font-medium">{selectedTrade.strategy}</p>
+                  </div>
+                  <div className="bg-gray-700 p-4 rounded-lg col-span-1 md:col-span-2">
+                    <h4 className="text-sm text-gray-400 mb-1">Comments</h4>
+                    <p className="font-medium">{selectedTrade.comments}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 mt-auto border-t border-gray-700">
+                <div className="flex justify-end space-x-3">
+                  <button 
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditForm(selectedTrade);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteTrade(selectedTrade.id);
+                    }} 
+                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -343,250 +390,275 @@ function JournalPage() {
 
       {/* Add/Edit Trade Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 flex items-center justify-center  bg-opacity-30 backdrop-blur-md z-50">
-          <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden m-4">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-6">
-                <h3 className="text-xl font-bold text-blue-400">
-                  {isEditing ? "Edit Trade" : "Add New Trade"}
-                </h3>
-                <button 
-                  onClick={() => setIsFormOpen(false)} 
-                  className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full h-8 w-8 flex items-center justify-center"
-                >
-                  ×
-                </button>
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-md z-50">
+          <div 
+            ref={formRef}
+            className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-3xl w-full m-4"
+            style={{
+              maxHeight: '90vh',
+              overflow: 'hidden'
+            }}
+          >
+            <div className="flex flex-col h-full">
+              <div className="p-6 border-b border-gray-700">
+                <div className="flex justify-between items-start">
+                  <h3 className="text-xl font-bold text-blue-400">
+                    {isEditing ? "Edit Trade" : "Add New Trade"}
+                  </h3>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsFormOpen(false);
+                    }} 
+                    className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full h-8 w-8 flex items-center justify-center"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Basic Information */}
-                  <div className="space-y-4 col-span-1 md:col-span-2">
-                    <h4 className="text-lg font-medium text-blue-300">Basic Information</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div 
+                className="overflow-y-auto p-6" 
+                style={{ 
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: '#4B5563 #1F2937'
+                }}
+              >
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Basic Information */}
+                    <div className="space-y-4 col-span-1 md:col-span-2">
+                      <h4 className="text-lg font-medium text-blue-300">Basic Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Scrip/Symbol</label>
+                          <input
+                            type="text"
+                            name="scrip"
+                            value={formData.scrip}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Market</label>
+                          <select
+                            name="market"
+                            value={formData.market}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          >
+                            <option value="">Select Market</option>
+                            <option value="NSE">NSE</option>
+                            <option value="BSE">BSE</option>
+                            <option value="Crypto">Crypto</option>
+                            <option value="Forex">Forex</option>
+                            <option value="Commodities">Commodities</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Segment</label>
+                          <select
+                            name="segment"
+                            value={formData.segment}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          >
+                            <option value="">Select Segment</option>
+                            <option value="Equity">Equity</option>
+                            <option value="F&O">F&O</option>
+                            <option value="Spot">Spot</option>
+                            <option value="Futures">Futures</option>
+                            <option value="Options">Options</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Image URL</label>
+                          <input
+                            type="text"
+                            name="image"
+                            value={formData.image}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Entry Details */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-medium text-blue-300">Entry Details</h4>
                       <div>
-                        <label className="block text-sm text-gray-400 mb-1">Scrip/Symbol</label>
+                        <label className="block text-sm text-gray-400 mb-1">Entry Date</label>
                         <input
-                          type="text"
-                          name="scrip"
-                          value={formData.scrip}
+                          type="date"
+                          name="buyDate"
+                          value={formData.buyDate}
                           onChange={handleInputChange}
                           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-sm text-gray-400 mb-1">Market</label>
-                        <select
-                          name="market"
-                          value={formData.market}
-                          onChange={handleInputChange}
-                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required
-                        >
-                          <option value="">Select Market</option>
-                          <option value="NSE">NSE</option>
-                          <option value="BSE">BSE</option>
-                          <option value="Crypto">Crypto</option>
-                          <option value="Forex">Forex</option>
-                          <option value="Commodities">Commodities</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-400 mb-1">Segment</label>
-                        <select
-                          name="segment"
-                          value={formData.segment}
-                          onChange={handleInputChange}
-                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          required
-                        >
-                          <option value="">Select Segment</option>
-                          <option value="Equity">Equity</option>
-                          <option value="F&O">F&O</option>
-                          <option value="Spot">Spot</option>
-                          <option value="Futures">Futures</option>
-                          <option value="Options">Options</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-400 mb-1">Image URL</label>
+                        <label className="block text-sm text-gray-400 mb-1">Entry Time</label>
                         <input
                           type="text"
-                          name="image"
-                          value={formData.image}
+                          name="timeOfBuy"
+                          value={formData.timeOfBuy}
                           onChange={handleInputChange}
+                          placeholder="e.g. 10:30 AM"
                           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Entry Details */}
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-medium text-blue-300">Entry Details</h4>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Entry Date</label>
-                      <input
-                        type="date"
-                        name="buyDate"
-                        value={formData.buyDate}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Entry Time</label>
-                      <input
-                        type="text"
-                        name="timeOfBuy"
-                        value={formData.timeOfBuy}
-                        onChange={handleInputChange}
-                        placeholder="e.g. 10:30 AM"
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Entry Price</label>
-                      <input
-                        type="number"
-                        name="buyPrice"
-                        value={formData.buyPrice}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Stop Loss</label>
-                      <input
-                        type="number"
-                        name="stopLoss"
-                        value={formData.stopLoss}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Exit Details */}
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-medium text-blue-300">Exit Details</h4>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Exit Date</label>
-                      <input
-                        type="date"
-                        name="sellDate"
-                        value={formData.sellDate}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Exit Time</label>
-                      <input
-                        type="text"
-                        name="timeOfSell"
-                        value={formData.timeOfSell}
-                        onChange={handleInputChange}
-                        placeholder="e.g. 02:45 PM"
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Exit Price</label>
-                      <input
-                        type="number"
-                        name="sellPrice"
-                        value={formData.sellPrice}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Capital Used</label>
-                      <input
-                        type="number"
-                        name="capitalUsed"
-                        value={formData.capitalUsed}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Trade Analysis */}
-                  <div className="space-y-4 col-span-1 md:col-span-2">
-                    <h4 className="text-lg font-medium text-blue-300">Trade Analysis</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm text-gray-400 mb-1">Risk/Reward Ratio</label>
-                        <input
-                          type="text"
-                          name="riskRewardRatio"
-                          value={formData.riskRewardRatio}
-                          onChange={handleInputChange}
-                          placeholder="e.g. 1:2"
-                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
                         />
                       </div>
                       <div>
-                        <label className="block text-sm text-gray-400 mb-1">Strategy</label>
+                        <label className="block text-sm text-gray-400 mb-1">Entry Price</label>
                         <input
-                          type="text"
-                          name="strategy"
-                          value={formData.strategy}
+                          type="number"
+                          name="buyPrice"
+                          value={formData.buyPrice}
                           onChange={handleInputChange}
                           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           required
                         />
                       </div>
                       <div>
-                        <button
-                          type="button"
-                          onClick={calculateResults}
-                          className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-                        >
-                          Calculate Results
-                        </button>
+                        <label className="block text-sm text-gray-400 mb-1">Stop Loss</label>
+                        <input
+                          type="number"
+                          name="stopLoss"
+                          value={formData.stopLoss}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-1">Comments/Notes</label>
-                      <textarea
-                        name="comments"
-                        value={formData.comments}
-                        onChange={handleInputChange}
-                        rows="3"
-                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      ></textarea>
+
+                    {/* Exit Details */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-medium text-blue-300">Exit Details</h4>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Exit Date</label>
+                        <input
+                          type="date"
+                          name="sellDate"
+                          value={formData.sellDate}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Exit Time</label>
+                        <input
+                          type="text"
+                          name="timeOfSell"
+                          value={formData.timeOfSell}
+                          onChange={handleInputChange}
+                          placeholder="e.g. 02:45 PM"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Exit Price</label>
+                        <input
+                          type="number"
+                          name="sellPrice"
+                          value={formData.sellPrice}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Capital Used</label>
+                        <input
+                          type="number"
+                          name="capitalUsed"
+                          value={formData.capitalUsed}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Trade Analysis */}
+                    <div className="space-y-4 col-span-1 md:col-span-2">
+                      <h4 className="text-lg font-medium text-blue-300">Trade Analysis</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Risk/Reward Ratio</label>
+                          <input
+                            type="text"
+                            name="riskRewardRatio"
+                            value={formData.riskRewardRatio}
+                            onChange={handleInputChange}
+                            placeholder="e.g. 1:2"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Strategy</label>
+                          <input
+                            type="text"
+                            name="strategy"
+                            value={formData.strategy}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <button
+                            type="button"
+                            onClick={calculateResults}
+                            className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                          >
+                            Calculate Results
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">Comments/Notes</label>
+                        <textarea
+                          name="comments"
+                          value={formData.comments}
+                          onChange={handleInputChange}
+                          rows="3"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        ></textarea>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </form>
+              </div>
 
-                <div className="flex justify-end space-x-3 pt-4">
+              <div className="p-6 mt-auto border-t border-gray-700">
+                <div className="flex justify-end space-x-3">
                   <button
                     type="button"
-                    onClick={() => setIsFormOpen(false)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsFormOpen(false);
+                    }}
                     className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg"
                   >
                     Cancel
                   </button>
                   <button
-                    type="submit"
+                    onClick={handleSubmit}
                     className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg"
                   >
                     {isEditing ? "Update Trade" : "Add Trade"}
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         </div>
