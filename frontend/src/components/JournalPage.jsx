@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import TradeDeleteConfirmationDialog from './TradeDeleteConfirmationDialog';
 
 const sampleTrades = [
   {
@@ -98,6 +99,8 @@ function JournalPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(emptyTradeTemplate);
   const [imagePreview, setImagePreview] = useState(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [tradeToDelete, setTradeToDelete] = useState(null);
   const fileInputRef = useRef(null);
 
   // Refs for modal content
@@ -174,6 +177,8 @@ function JournalPage() {
   const deleteTrade = (id) => {
     setTrades(trades.filter((trade) => trade.id !== id));
     setSelectedTrade(null);
+    setIsDeleteDialogOpen(false);
+    setTradeToDelete(null);
   };
 
   // Open form for creating a new trade
@@ -199,6 +204,13 @@ function JournalPage() {
       ...formData,
       [name]: value
     });
+  };
+
+
+  // Add a function to handle opening the delete dialog
+  const openDeleteDialog = (trade) => {
+    setTradeToDelete(trade);
+    setIsDeleteDialogOpen(true);
   };
 
   // Calculate percentage change and capital after trade
@@ -240,6 +252,24 @@ function JournalPage() {
     setIsFormOpen(false);
     setFormData(emptyTradeTemplate);
   };
+
+  useEffect(() => {
+    function handleEscapeKey(event) {
+      if (event.key === 'Escape') {
+        if (isDeleteDialogOpen) {
+          setIsDeleteDialogOpen(false);
+        } else {
+          setSelectedTrade(null);
+          setIsFormOpen(false);
+        }
+      }
+    }
+  
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [isDeleteDialogOpen]);
 
   // Filter trades based on search input
   const filteredTrades = trades.filter(trade =>
@@ -329,7 +359,7 @@ function JournalPage() {
 
       {/* Trade Details Modal */}
       {selectedTrade && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-md z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-opacity-30 backdrop-blur-md z-50">
           <div
             ref={tradeDetailsRef}
             className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full m-4 flex flex-col"
@@ -418,7 +448,7 @@ function JournalPage() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteTrade(selectedTrade.id);
+                    openDeleteDialog(selectedTrade);
                   }}
                   className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
                 >
@@ -432,7 +462,7 @@ function JournalPage() {
 
       {/* Add/Edit Trade Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 backdrop-blur-md z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-opacity-30 backdrop-blur-md backdrop-blur-md z-50">
           <div
             ref={formRef}
             className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-3xl w-full m-4 flex flex-col"
@@ -745,6 +775,12 @@ function JournalPage() {
           </div>
         </div>
       )}
+      <TradeDeleteConfirmationDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={() => deleteTrade(tradeToDelete?.id)}
+        tradeName={tradeToDelete?.scrip}
+      />
     </div>
   );
 }
