@@ -338,12 +338,32 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
   };
 
   const removeIndicator = (indicatorId) => {
-    // Remove the indicator from state
+    // Immediately remove the indicator series from the chart
+    if (indicatorSeriesRefs.current[indicatorId]) {
+      try {
+        chartRef.current.removeSeries(indicatorSeriesRefs.current[indicatorId]);
+        delete indicatorSeriesRefs.current[indicatorId];
+      } catch (error) {
+        console.warn('Failed to remove indicator series:', error);
+      }
+    }
+    
+    // For indicators with multiple series (like Bollinger Bands)
+    [`${indicatorId}_middle`, `${indicatorId}_upper`, `${indicatorId}_lower`].forEach(seriesId => {
+      if (indicatorSeriesRefs.current[seriesId]) {
+        try {
+          chartRef.current.removeSeries(indicatorSeriesRefs.current[seriesId]);
+          delete indicatorSeriesRefs.current[seriesId];
+        } catch (error) {
+          console.warn('Failed to remove indicator series part:', error);
+        }
+      }
+    });
+    
+    // Then update the state
     setActiveIndicators(prevIndicators => 
       prevIndicators.filter(indicator => indicator.id !== indicatorId)
     );
-    
-    // The actual series removal will happen in the next render when applyIndicators runs
   };
 
   // Configure volume series with TradingView-like appearance
