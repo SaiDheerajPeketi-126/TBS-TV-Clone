@@ -6,6 +6,15 @@ import { convertIntervalToMinutes } from '../utils/helper';
 import ChartToolbar from './ChartToolbar';
 import ChartHeader from './ChartHeader';
 import { API_CONFIG } from '../constants';
+import { 
+  calculateMA, 
+  calculateEMA, 
+  calculateBollingerBands, 
+  calculateRSI, 
+  calculateMACD, 
+  calculateVolumeProfile, 
+  getDefaultParams 
+} from '../utils/indicators';
 
 function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selectedSymbol, setCurrentInterval, currentlyActiveExchange }) {
   const chartContainerRef = useRef(null);
@@ -108,31 +117,11 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     });
   };
 
-  // Implement indicator calculation functions
   const addMovingAverage = (data, params) => {
     if (!chartRef.current || !data || data.length === 0) return;
-
-    const period = params.period;
-    const maData = [];
-
-    // Calculate MA values
-    for (let i = 0; i < data.length; i++) {
-      if (i < period - 1) {
-        // Not enough data points yet
-        continue;
-      }
-
-      let sum = 0;
-      for (let j = 0; j < period; j++) {
-        sum += data[i - j].close;
-      }
-
-      maData.push({
-        time: data[i].time,
-        value: sum / period
-      });
-    }
-
+    
+    const maData = calculateMA(data, params.period);
+    
     // Create a line series for the MA
     const maSeries = chartRef.current.addLineSeries({
       color: params.color,
@@ -142,43 +131,16 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       priceLineVisible: false,
       crosshairMarkerVisible: false,
     });
-
+    
     maSeries.setData(maData);
     indicatorSeriesRefs.current.ma = maSeries;
   };
-
-  // Add EMA function (similar to MA)
+  
   const addEMA = (data, params) => {
     if (!chartRef.current || !data || data.length === 0) return;
-
-    const period = params.period;
-    const emaData = [];
-    const multiplier = 2 / (period + 1);
-
-    // Calculate first EMA as SMA
-    let sum = 0;
-    for (let i = 0; i < period; i++) {
-      sum += data[i].close;
-    }
-    let prevEMA = sum / period;
-
-    emaData.push({
-      time: data[period - 1].time,
-      value: prevEMA
-    });
-
-    // Calculate subsequent EMAs
-    for (let i = period; i < data.length; i++) {
-      const currentClose = data[i].close;
-      const currentEMA = (currentClose - prevEMA) * multiplier + prevEMA;
-      prevEMA = currentEMA;
-
-      emaData.push({
-        time: data[i].time,
-        value: currentEMA
-      });
-    }
-
+    
+    const emaData = calculateEMA(data, params.period);
+    
     // Create a line series for the EMA
     const emaSeries = chartRef.current.addLineSeries({
       color: params.color,
@@ -188,11 +150,170 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       priceLineVisible: false,
       crosshairMarkerVisible: false,
     });
-
+    
     emaSeries.setData(emaData);
     indicatorSeriesRefs.current.ema = emaSeries;
   };
-
+  
+  const addBollingerBands = (data, params) => {
+    if (!chartRef.current || !data || data.length === 0) return;
+    
+    const { upper, middle, lower } = calculateBollingerBands(data, params.period, params.stdDev);
+    
+    // Middle band
+    const middleSeries = chartRef.current.addLineSeries({
+      color: params.color,
+      lineWidth: 1.5,
+      lineStyle: 0, // Solid line
+      lastValueVisible: true,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    
+    // Upper band
+    const upperSeries = chartRef.current.addLineSeries({
+      color: params.color,
+      lineWidth: 1,
+      lineStyle: 1, // Dashed line
+      lastValueVisible: false,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    
+    // Lower band
+    const lowerSeries = chartRef.current.addLineSeries({
+      color: params.color,
+      lineWidth: 1,
+      lineStyle: 1, // Dashed line
+      lastValueVisible: false,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    
+    middleSeries.setData(middle);
+    upperSeries.setData(upper);
+    lowerSeries.setData(lower);
+    
+    indicatorSeriesRefs.current.bbMiddle = middleSeries;
+    indicatorSeriesRefs.current.bbUpper = upperSeries;
+    indicatorSeriesRefs.current.bbLower = lowerSeries;
+  };
+  
+  const addRSI = (data, params) => {
+    if (!chartRef.current || !data || data.length === 0) return;
+    
+    const rsiData = calculateRSI(data, params.period);
+    
+    // Create a separate pane for RSI
+    const rsiSeries = chartRef.current.addLineSeries({
+      color: params.color,
+      lineWidth: 1.5,
+      priceFormat: {
+        type: 'custom',
+        formatter: value => `${Math.round(value)}`,
+      },
+      pane: 1, // Put in a separate pane
+    });
+    
+    // Set rsi data
+    rsiSeries.setData(rsiData);
+    
+    // Add overbought and oversold levels
+    const priceRange = {
+      from: 0,
+      to: 100,
+    };
+    
+    // Configure the pane
+    chartRef.current.applyOptions({
+      priceScale: {
+        rsi: {
+          scaleMargins: {
+            top: 0.8, // Position at the bottom of the chart
+            bottom: 0,
+          },
+        }
+      }
+    });
+    
+    indicatorSeriesRefs.current.rsi = rsiSeries;
+  };
+  
+  const addMACD = (data, params) => {
+    if (!chartRef.current || !data || data.length === 0) return;
+    
+    const { macd, signal, histogram } = calculateMACD(
+      data, 
+      params.fastPeriod, 
+      params.slowPeriod, 
+      params.signalPeriod
+    );
+    
+    // Create a separate pane for MACD
+    const macdSeries = chartRef.current.addLineSeries({
+      color: params.fastColor,
+      lineWidth: 1.5,
+      pane: 1,
+    });
+    
+    const signalSeries = chartRef.current.addLineSeries({
+      color: params.signalColor,
+      lineWidth: 1.5,
+      pane: 1,
+    });
+    
+    const histogramSeries = chartRef.current.addHistogramSeries({
+      color: params.slowColor,
+      pane: 1,
+    });
+    
+    // Format histogram data with colors
+    const histogramFormatted = histogram.map(bar => ({
+      time: bar.time,
+      value: bar.value,
+      color: bar.value >= 0 ? params.fastColor : params.slowColor,
+    }));
+    
+    macdSeries.setData(macd);
+    signalSeries.setData(signal);
+    histogramSeries.setData(histogramFormatted);
+    
+    // Configure the pane
+    chartRef.current.applyOptions({
+      priceScale: {
+        macd: {
+          scaleMargins: {
+            top: 0.7,
+            bottom: 0,
+          },
+        }
+      }
+    });
+    
+    indicatorSeriesRefs.current.macdLine = macdSeries;
+    indicatorSeriesRefs.current.signalLine = signalSeries;
+    indicatorSeriesRefs.current.histogram = histogramSeries;
+  };
+  
+  const addVolumeProfile = (data, params) => {
+    if (!chartRef.current || !data || data.length === 0) return;
+    
+    const volumeProfile = calculateVolumeProfile(data, params.numOfBars);
+    
+    // Create horizontal histogram for volume profile
+    chartRef.current.addHistogramSeries({
+      color: params.color,
+      base: 0,
+      priceFormat: {
+        type: 'volume',
+      },
+    });
+    
+    // Implementation for volume profile visualization would require custom handling
+    // This is a simplified version
+    console.log("Volume profile calculation completed:", volumeProfile);
+    // More complex rendering of volume profile would require custom overlay
+  };
 
   // Configure volume series with TradingView-like appearance
   const configureVolumeSeries = (chart, data) => {
