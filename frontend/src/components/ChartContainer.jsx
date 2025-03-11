@@ -6,14 +6,14 @@ import { convertIntervalToMinutes } from '../utils/helper';
 import ChartToolbar from './ChartToolbar';
 import ChartHeader from './ChartHeader';
 import { API_CONFIG } from '../constants';
-import { 
-  calculateMA, 
-  calculateEMA, 
-  calculateBollingerBands, 
-  calculateRSI, 
-  calculateMACD, 
-  calculateVolumeProfile, 
-  getDefaultParams 
+import {
+  calculateMA,
+  calculateEMA,
+  calculateBollingerBands,
+  calculateRSI,
+  calculateMACD,
+  calculateVolumeProfile,
+  getDefaultParams
 } from '../utils/indicators';
 
 function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selectedSymbol, setCurrentInterval, currentlyActiveExchange }) {
@@ -38,10 +38,17 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
   // Add this function to handle adding indicators
   const handleAddIndicator = (indicatorId) => {
-    // Prevent adding duplicate indicators
-    if (activeIndicators.some(ind => ind.id === indicatorId)) return;
+    // Generate a unique ID for this indicator instance
+    const uniqueId = `${indicatorId}_${Date.now()}`;
 
-    const newIndicator = { id: indicatorId, params: getDefaultParams(indicatorId) };
+    // Create a new indicator with default parameters
+    const newIndicator = {
+      id: uniqueId,
+      type: indicatorId,  // Store the indicator type separately
+      params: getDefaultParams(indicatorId),
+      name: `${indicatorId.toUpperCase()} ${activeIndicators.filter(ind => ind.type === indicatorId).length + 1}`
+    };
+
     setActiveIndicators([...activeIndicators, newIndicator]);
   };
 
@@ -72,15 +79,25 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     }
   };
 
+  const updateIndicatorParams = (indicatorId, newParams) => {
+    setActiveIndicators(prevIndicators =>
+      prevIndicators.map(indicator =>
+        indicator.id === indicatorId
+          ? { ...indicator, params: { ...indicator.params, ...newParams } }
+          : indicator
+      )
+    );
+  };
+
   // Add this function to apply indicators
   const applyIndicators = (data) => {
     if (!chartRef.current || !data || !activeIndicators.length) return;
 
     // Remove existing indicator series
-    Object.values(indicatorSeriesRefs.current).forEach(series => {
-      if (series) {
+    Object.keys(indicatorSeriesRefs.current).forEach(seriesId => {
+      if (indicatorSeriesRefs.current[seriesId]) {
         try {
-          chartRef.current.removeSeries(series);
+          chartRef.current.removeSeries(indicatorSeriesRefs.current[seriesId]);
         } catch (error) {
           console.warn('Failed to remove indicator series:', error);
         }
@@ -92,24 +109,24 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
     // Apply each active indicator
     activeIndicators.forEach(indicator => {
-      switch (indicator.id) {
+      switch (indicator.type) {
         case 'ma':
-          addMovingAverage(data, indicator.params);
+          addMovingAverage(data, indicator.params, indicator.id);
           break;
         case 'ema':
-          addEMA(data, indicator.params);
+          addEMA(data, indicator.params, indicator.id);
           break;
         case 'bb':
-          addBollingerBands(data, indicator.params);
+          addBollingerBands(data, indicator.params, indicator.id);
           break;
         case 'rsi':
-          addRSI(data, indicator.params);
+          addRSI(data, indicator.params, indicator.id);
           break;
         case 'macd':
-          addMACD(data, indicator.params);
+          addMACD(data, indicator.params, indicator.id);
           break;
         case 'volume':
-          addVolumeProfile(data, indicator.params);
+          addVolumeProfile(data, indicator.params, indicator.id);
           break;
         default:
           break;
@@ -117,11 +134,11 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     });
   };
 
-  const addMovingAverage = (data, params) => {
+  const addMovingAverage = (data, params, indicatorId) => {
     if (!chartRef.current || !data || data.length === 0) return;
-    
+
     const maData = calculateMA(data, params.period);
-    
+
     // Create a line series for the MA
     const maSeries = chartRef.current.addLineSeries({
       color: params.color,
@@ -130,46 +147,51 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       lastValueVisible: true,
       priceLineVisible: false,
       crosshairMarkerVisible: false,
+      title: `MA(${params.period})`, // Add title for legend
     });
-    
+
     maSeries.setData(maData);
-    indicatorSeriesRefs.current.ma = maSeries;
+    indicatorSeriesRefs.current[indicatorId] = maSeries;
   };
-  
-  const addEMA = (data, params) => {
+
+  // Similarly update other indicator functions (addEMA, addBollingerBands, etc.)
+  // For example, update addEMA:
+  const addEMA = (data, params, indicatorId) => {
     if (!chartRef.current || !data || data.length === 0) return;
-    
+
     const emaData = calculateEMA(data, params.period);
-    
-    // Create a line series for the EMA
+
     const emaSeries = chartRef.current.addLineSeries({
       color: params.color,
       lineWidth: 1.5,
-      lineStyle: 0, // Solid line
+      lineStyle: 0,
       lastValueVisible: true,
       priceLineVisible: false,
       crosshairMarkerVisible: false,
+      title: `EMA(${params.period})`,
     });
-    
+
     emaSeries.setData(emaData);
-    indicatorSeriesRefs.current.ema = emaSeries;
+    indicatorSeriesRefs.current[indicatorId] = emaSeries;
   };
-  
-  const addBollingerBands = (data, params) => {
+
+  // For Bollinger Bands with multiple series, update reference keys:
+  const addBollingerBands = (data, params, indicatorId) => {
     if (!chartRef.current || !data || data.length === 0) return;
-    
+
     const { upper, middle, lower } = calculateBollingerBands(data, params.period, params.stdDev);
-    
+
     // Middle band
     const middleSeries = chartRef.current.addLineSeries({
       color: params.color,
       lineWidth: 1.5,
-      lineStyle: 0, // Solid line
+      lineStyle: 0,
       lastValueVisible: true,
       priceLineVisible: false,
       crosshairMarkerVisible: false,
+      title: `BB(${params.period}, ${params.stdDev})`,
     });
-    
+
     // Upper band
     const upperSeries = chartRef.current.addLineSeries({
       color: params.color,
@@ -179,7 +201,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       priceLineVisible: false,
       crosshairMarkerVisible: false,
     });
-    
+
     // Lower band
     const lowerSeries = chartRef.current.addLineSeries({
       color: params.color,
@@ -189,21 +211,21 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       priceLineVisible: false,
       crosshairMarkerVisible: false,
     });
-    
+
     middleSeries.setData(middle);
     upperSeries.setData(upper);
     lowerSeries.setData(lower);
-    
-    indicatorSeriesRefs.current.bbMiddle = middleSeries;
-    indicatorSeriesRefs.current.bbUpper = upperSeries;
-    indicatorSeriesRefs.current.bbLower = lowerSeries;
+
+    indicatorSeriesRefs.current[`${indicatorId}_middle`] = middleSeries;
+    indicatorSeriesRefs.current[`${indicatorId}_upper`] = upperSeries;
+    indicatorSeriesRefs.current[`${indicatorId}_lower`] = lowerSeries;
   };
-  
+
   const addRSI = (data, params) => {
     if (!chartRef.current || !data || data.length === 0) return;
-    
+
     const rsiData = calculateRSI(data, params.period);
-    
+
     // Create a separate pane for RSI
     const rsiSeries = chartRef.current.addLineSeries({
       color: params.color,
@@ -214,16 +236,16 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       },
       pane: 1, // Put in a separate pane
     });
-    
+
     // Set rsi data
     rsiSeries.setData(rsiData);
-    
+
     // Add overbought and oversold levels
     const priceRange = {
       from: 0,
       to: 100,
     };
-    
+
     // Configure the pane
     chartRef.current.applyOptions({
       priceScale: {
@@ -235,49 +257,49 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         }
       }
     });
-    
+
     indicatorSeriesRefs.current.rsi = rsiSeries;
   };
-  
+
   const addMACD = (data, params) => {
     if (!chartRef.current || !data || data.length === 0) return;
-    
+
     const { macd, signal, histogram } = calculateMACD(
-      data, 
-      params.fastPeriod, 
-      params.slowPeriod, 
+      data,
+      params.fastPeriod,
+      params.slowPeriod,
       params.signalPeriod
     );
-    
+
     // Create a separate pane for MACD
     const macdSeries = chartRef.current.addLineSeries({
       color: params.fastColor,
       lineWidth: 1.5,
       pane: 1,
     });
-    
+
     const signalSeries = chartRef.current.addLineSeries({
       color: params.signalColor,
       lineWidth: 1.5,
       pane: 1,
     });
-    
+
     const histogramSeries = chartRef.current.addHistogramSeries({
       color: params.slowColor,
       pane: 1,
     });
-    
+
     // Format histogram data with colors
     const histogramFormatted = histogram.map(bar => ({
       time: bar.time,
       value: bar.value,
       color: bar.value >= 0 ? params.fastColor : params.slowColor,
     }));
-    
+
     macdSeries.setData(macd);
     signalSeries.setData(signal);
     histogramSeries.setData(histogramFormatted);
-    
+
     // Configure the pane
     chartRef.current.applyOptions({
       priceScale: {
@@ -289,17 +311,17 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         }
       }
     });
-    
+
     indicatorSeriesRefs.current.macdLine = macdSeries;
     indicatorSeriesRefs.current.signalLine = signalSeries;
     indicatorSeriesRefs.current.histogram = histogramSeries;
   };
-  
+
   const addVolumeProfile = (data, params) => {
     if (!chartRef.current || !data || data.length === 0) return;
-    
+
     const volumeProfile = calculateVolumeProfile(data, params.numOfBars);
-    
+
     // Create horizontal histogram for volume profile
     chartRef.current.addHistogramSeries({
       color: params.color,
@@ -308,11 +330,20 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         type: 'volume',
       },
     });
-    
+
     // Implementation for volume profile visualization would require custom handling
     // This is a simplified version
     console.log("Volume profile calculation completed:", volumeProfile);
     // More complex rendering of volume profile would require custom overlay
+  };
+
+  const removeIndicator = (indicatorId) => {
+    // Remove the indicator from state
+    setActiveIndicators(prevIndicators => 
+      prevIndicators.filter(indicator => indicator.id !== indicatorId)
+    );
+    
+    // The actual series removal will happen in the next render when applyIndicators runs
   };
 
   // Configure volume series with TradingView-like appearance
@@ -822,7 +853,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
       applyChartStyle(chartStyle, chartData);
       applyIndicators(chartData);
     }
-  }, [chartStyle, chartData, activeIndicators ]);
+  }, [chartStyle, chartData, activeIndicators]);
 
   // Toggle fullscreen mode
   // Listen for fullscreen change events
@@ -942,6 +973,9 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         chartStyle={chartStyle}
         setChartStyle={setChartStyle}
         onAddIndicator={handleAddIndicator}
+        activeIndicators={activeIndicators}
+        onUpdateIndicator={updateIndicatorParams}
+        onRemoveIndicator={removeIndicator}
       />
       <div className="flex-1 relative transition-all duration-300 ease-in-out" ref={chartContainerRef}>
         {isLoading && (

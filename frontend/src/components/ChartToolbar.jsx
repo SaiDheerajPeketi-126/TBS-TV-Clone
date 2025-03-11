@@ -1,14 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LineIcon, CandlestickIcon, IndicatorIcon, DrawingIcon, MeasureIcon, TemplateIcon, ShareIcon, ChevronDownIcon } from './Icons';
 import IndicatorDropdown from './IndicatorDropdown';
+import IndicatorSettings from './IndicatorSettings';
 
-function ChartToolbar({ interval, setInterval, chartStyle, setChartStyle, onAddIndicator }) {
+function ChartToolbar({ interval, setInterval, chartStyle, setChartStyle, onAddIndicator, activeIndicators, onUpdateIndicator, onRemoveIndicator  }) {
   const intervals = ['1m', '5m', '15m', '30m', '1H', '4H', '1D', '1W', '1M'];
   const [showStyleDropdown, setShowStyleDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
   const [showIndicatorDropdown, setShowIndicatorDropdown] = useState(false);
   const indicatorDropdownRef = useRef(null);
+
+  const [showIndicatorSettings, setShowIndicatorSettings] = useState(false);
+  const indicatorSettingsRef = useRef(null);
 
   const chartStyles = [
     { id: 'candles', name: 'Candles', icon: <CandlestickIcon className="h-4 w-4" /> },
@@ -25,6 +29,20 @@ function ChartToolbar({ interval, setInterval, chartStyle, setChartStyle, onAddI
     function handleClickOutside(event) {
       if (indicatorDropdownRef.current && !indicatorDropdownRef.current.contains(event.target)) {
         setShowIndicatorDropdown(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Add this effect to close indicator settings when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (indicatorSettingsRef.current && !indicatorSettingsRef.current.contains(event.target)) {
+        setShowIndicatorSettings(false);
       }
     }
 
@@ -80,10 +98,14 @@ function ChartToolbar({ interval, setInterval, chartStyle, setChartStyle, onAddI
         </div>
 
         <div className="h-4 border-r border-gray-600 mx-1"></div>
+        
         <div className="relative" ref={indicatorDropdownRef}>
           <button
             className="p-1.5 hover:bg-gray-700 rounded"
-            onClick={() => setShowIndicatorDropdown(!showIndicatorDropdown)}
+            onClick={() => {
+              setShowIndicatorDropdown(!showIndicatorDropdown);
+              setShowIndicatorSettings(false);
+            }}
           >
             <IndicatorIcon className="h-4 w-4" />
           </button>
@@ -91,9 +113,43 @@ function ChartToolbar({ interval, setInterval, chartStyle, setChartStyle, onAddI
           <IndicatorDropdown
             isOpen={showIndicatorDropdown}
             onClose={() => setShowIndicatorDropdown(false)}
-            onSelectIndicator={onAddIndicator}
+            onSelectIndicator={(indicatorId) => {
+              onAddIndicator(indicatorId);
+              setShowIndicatorDropdown(false);
+            }}
           />
         </div>
+        
+        {/* Add indicator settings button */}
+        <div className="relative" ref={indicatorSettingsRef}>
+          <button
+            className={`p-1.5 rounded flex items-center ${activeIndicators.length > 0 ? 'text-blue-400 hover:bg-gray-700' : 'text-gray-500 cursor-not-allowed'}`}
+            onClick={() => {
+              if (activeIndicators.length > 0) {
+                setShowIndicatorSettings(!showIndicatorSettings);
+                setShowIndicatorDropdown(false);
+              }
+            }}
+            disabled={activeIndicators.length === 0}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {activeIndicators.length > 0 && (
+              <span className="ml-1 text-xs">{activeIndicators.length}</span>
+            )}
+          </button>
+          
+          {showIndicatorSettings && (
+            <IndicatorSettings 
+              indicators={activeIndicators}
+              onUpdateIndicator={onUpdateIndicator}
+              onRemoveIndicator={onRemoveIndicator}
+            />
+          )}
+        </div>
+        
         <button className="p-1.5 hover:bg-gray-700 rounded">
           <DrawingIcon className="h-4 w-4" />
         </button>
