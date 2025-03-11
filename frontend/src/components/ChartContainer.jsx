@@ -24,6 +24,175 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
     change: "N/A",
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeIndicators, setActiveIndicators] = useState([]);
+  const indicatorSeriesRefs = useRef({});
+
+  // Add this function to handle adding indicators
+  const handleAddIndicator = (indicatorId) => {
+    // Prevent adding duplicate indicators
+    if (activeIndicators.some(ind => ind.id === indicatorId)) return;
+
+    const newIndicator = { id: indicatorId, params: getDefaultParams(indicatorId) };
+    setActiveIndicators([...activeIndicators, newIndicator]);
+  };
+
+  // Add this helper function to get default parameters for indicators
+  const getDefaultParams = (indicatorId) => {
+    switch (indicatorId) {
+      case 'ma':
+        return { period: 20, color: '#2196F3' };
+      case 'ema':
+        return { period: 14, color: '#FF9800' };
+      case 'bb':
+        return { period: 20, stdDev: 2, color: '#9C27B0' };
+      case 'rsi':
+        return { period: 14, overbought: 70, oversold: 30, color: '#4CAF50' };
+      case 'macd':
+        return {
+          fastPeriod: 12,
+          slowPeriod: 26,
+          signalPeriod: 9,
+          fastColor: '#2196F3',
+          slowColor: '#F44336',
+          signalColor: '#FF9800'
+        };
+      case 'volume':
+        return { numOfBars: 10, color: '#7986CB' };
+      default:
+        return {};
+    }
+  };
+
+  // Add this function to apply indicators
+  const applyIndicators = (data) => {
+    if (!chartRef.current || !data || !activeIndicators.length) return;
+
+    // Remove existing indicator series
+    Object.values(indicatorSeriesRefs.current).forEach(series => {
+      if (series) {
+        try {
+          chartRef.current.removeSeries(series);
+        } catch (error) {
+          console.warn('Failed to remove indicator series:', error);
+        }
+      }
+    });
+
+    // Reset refs
+    indicatorSeriesRefs.current = {};
+
+    // Apply each active indicator
+    activeIndicators.forEach(indicator => {
+      switch (indicator.id) {
+        case 'ma':
+          addMovingAverage(data, indicator.params);
+          break;
+        case 'ema':
+          addEMA(data, indicator.params);
+          break;
+        case 'bb':
+          addBollingerBands(data, indicator.params);
+          break;
+        case 'rsi':
+          addRSI(data, indicator.params);
+          break;
+        case 'macd':
+          addMACD(data, indicator.params);
+          break;
+        case 'volume':
+          addVolumeProfile(data, indicator.params);
+          break;
+        default:
+          break;
+      }
+    });
+  };
+
+  // Implement indicator calculation functions
+  const addMovingAverage = (data, params) => {
+    if (!chartRef.current || !data || data.length === 0) return;
+
+    const period = params.period;
+    const maData = [];
+
+    // Calculate MA values
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) {
+        // Not enough data points yet
+        continue;
+      }
+
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += data[i - j].close;
+      }
+
+      maData.push({
+        time: data[i].time,
+        value: sum / period
+      });
+    }
+
+    // Create a line series for the MA
+    const maSeries = chartRef.current.addLineSeries({
+      color: params.color,
+      lineWidth: 1.5,
+      lineStyle: 0, // Solid line
+      lastValueVisible: true,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
+    maSeries.setData(maData);
+    indicatorSeriesRefs.current.ma = maSeries;
+  };
+
+  // Add EMA function (similar to MA)
+  const addEMA = (data, params) => {
+    if (!chartRef.current || !data || data.length === 0) return;
+
+    const period = params.period;
+    const emaData = [];
+    const multiplier = 2 / (period + 1);
+
+    // Calculate first EMA as SMA
+    let sum = 0;
+    for (let i = 0; i < period; i++) {
+      sum += data[i].close;
+    }
+    let prevEMA = sum / period;
+
+    emaData.push({
+      time: data[period - 1].time,
+      value: prevEMA
+    });
+
+    // Calculate subsequent EMAs
+    for (let i = period; i < data.length; i++) {
+      const currentClose = data[i].close;
+      const currentEMA = (currentClose - prevEMA) * multiplier + prevEMA;
+      prevEMA = currentEMA;
+
+      emaData.push({
+        time: data[i].time,
+        value: currentEMA
+      });
+    }
+
+    // Create a line series for the EMA
+    const emaSeries = chartRef.current.addLineSeries({
+      color: params.color,
+      lineWidth: 1.5,
+      lineStyle: 0, // Solid line
+      lastValueVisible: true,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
+    emaSeries.setData(emaData);
+    indicatorSeriesRefs.current.ema = emaSeries;
+  };
+
 
   // Configure volume series with TradingView-like appearance
   const configureVolumeSeries = (chart, data) => {
@@ -223,6 +392,9 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
 
       // Apply the appropriate chart style
       applyChartStyle(chartStyle, data);
+
+      // Apply indicators
+      applyIndicators(data);
 
       // Set chart's visible range to show most recent data with some history
       chartRef.current.timeScale().fitContent();
@@ -527,8 +699,9 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
   useEffect(() => {
     if (chartData) {
       applyChartStyle(chartStyle, chartData);
+      applyIndicators(chartData);
     }
-  }, [chartStyle, chartData]);
+  }, [chartStyle, chartData, activeIndicators ]);
 
   // Toggle fullscreen mode
   // Listen for fullscreen change events
@@ -647,6 +820,7 @@ function ChartContainer({ isSidebarOpen, toggleSidebar, currentInterval, selecte
         setInterval={setCurrentInterval}
         chartStyle={chartStyle}
         setChartStyle={setChartStyle}
+        onAddIndicator={handleAddIndicator}
       />
       <div className="flex-1 relative transition-all duration-300 ease-in-out" ref={chartContainerRef}>
         {isLoading && (
